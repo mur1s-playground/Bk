@@ -1,6 +1,8 @@
 #include "Player.hpp"
 
 #include <vector>
+#include <random>
+#include <ctime>
 
 map<string, struct player> players;
 
@@ -14,6 +16,14 @@ void player_add(string name, enum player_type pt) {
             p.name[i] = name[i];
             p.name_len = i;
         }
+        p.health = 100;
+        for (int i = 0; i < 6; i++) {
+            p.inventory[i].item_id = UINT_MAX;
+            p.inventory[i].item_param = 0;
+        }
+        p.player_stance = PS_WALKING;
+        p.player_action = PA_NONE;
+        p.orientation = (float)(rand() % 360);
         players.try_emplace(name, p);
     }
 }

@@ -22,6 +22,11 @@ enum player_action {
 	PA_SHOOTING
 };
 
+struct player_item {
+	unsigned int	item_id;
+	int				item_param;
+};
+
 struct player {
 	enum player_type pt;
 
@@ -30,6 +35,9 @@ struct player {
 
 	struct vector3<float> position;
 	float orientation;
+	int health;
+
+	struct player_item inventory[6];
 
 	enum player_stance player_stance;
 	enum player_action player_action;

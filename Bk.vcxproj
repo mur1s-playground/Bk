@@ -95,10 +95,12 @@
     <ClInclude Include="Camera.hpp" />
     <ClInclude Include="Copy.hpp" />
     <ClInclude Include="DrawPlayers.hpp" />
+    <ClInclude Include="Grid.hpp" />
     <ClInclude Include="Main.hpp" />
     <ClInclude Include="Player.hpp" />
     <ClInclude Include="Resize.hpp" />
     <ClInclude Include="SDLShow.hpp" />
+    <ClInclude Include="Storm.hpp" />
     <ClInclude Include="Util.hpp" />
     <ClInclude Include="Vector2.hpp" />
     <ClInclude Include="Vector3.hpp" />
@@ -107,6 +109,7 @@
     <CudaCompile Include="Copy.cu" />
     <CudaCompile Include="DrawPlayers.cu" />
     <CudaCompile Include="Resize.cu" />
+    <CudaCompile Include="Storm.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
