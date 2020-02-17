@@ -7,6 +7,7 @@
 #include "AssetLoader.hpp"
 #include "Grid.hpp"
 #include "Camera.hpp"
+#include "Model.hpp"
 #include "Player.hpp"
 #include "SDLShow.hpp"
 #include "Resize.hpp"
@@ -45,7 +46,7 @@ int main(int argc, char** argv) {
 	bit_field_register_device(&bf_assets, 0);
 	asset_loader_load_all(&bf_assets);
 
-	map_dimensions = { 4096, 4096 };
+	map_dimensions = { 8192, 8192 };
 
 	bit_field_init(&bf_rw, 2048, 1024);
 	bit_field_register_device(&bf_rw, 0);
@@ -53,49 +54,55 @@ int main(int argc, char** argv) {
 	struct grid gd;
 	grid_init(&bf_rw, &gd, struct vector3<float> ((float)map_dimensions[0], (float)map_dimensions[1], 1.0f), struct vector3<float> (32.0f, 32.0f, 1.0f), struct vector3<float> (0, 0, 0));
 
-	//player models
-	vector<struct player_model> player_models;
+	//models
+	vector<struct model> models;
 
-	//hope
-	vector<unsigned int> hope_model_positions;
-	vector<unsigned int> hope_model_med_positions;
-	vector<unsigned int> hope_model_lo_positions;
-	vector<unsigned int> hope_shadow_positions;
-	vector<unsigned int> hope_shadow_med_positions;
-	vector<unsigned int> hope_shadow_lo_positions;
+	//hope model
+	vector<string> hope_file_prefixes;
+	hope_file_prefixes.push_back("hope_model_hi__00");
+	hope_file_prefixes.push_back("hope_model_med__00");
+	hope_file_prefixes.push_back("hope_model_lo__00");
+	hope_file_prefixes.push_back("hope_model_shadow_hi__00");
+	hope_file_prefixes.push_back("hope_model_shadow_med__00");
+	hope_file_prefixes.push_back("hope_model_shadow_lo__00");
+	
+	struct model m_hope;
+	model_init(&m_hope, &bf_assets, hope_file_prefixes, 0, MT_PLAYER, 1, 36, 1 / 8.0f, struct vector3<unsigned int>(256, 256, 1), 1 / 8.0f, struct vector3<unsigned int>(256, 256, 1), struct vector2<unsigned int>(2, 9));
+	models.push_back(m_hope);
+	//
 
-	struct player_model pm_hope;
-	for (int i = 1; i <= 36; i++) {
-		stringstream ls;
-		if (i < 10) ls << 0;
-		ls << i;
-		hope_model_positions.push_back(assets["hope_model_hi__00" + ls.str() + ".png"]);
-		hope_model_med_positions.push_back(assets["hope_model_med__00" + ls.str() + ".png"]);
-		hope_model_lo_positions.push_back(assets["hope_model_lo__00" + ls.str() + ".png"]);
+	//tree model
+	vector<string> tree_file_prefixes;
+	tree_file_prefixes.push_back("tree_model_hi__00");
+	tree_file_prefixes.push_back("tree_model_med__00");
+	tree_file_prefixes.push_back("tree_model_lo__00");
+	tree_file_prefixes.push_back("tree_model_shadow_hi__00");
+	tree_file_prefixes.push_back("tree_model_shadow_med__00");
+	tree_file_prefixes.push_back("tree_model_shadow_lo__00");
 
-		hope_shadow_positions.push_back(assets["hope_model_shadow_hi__00" + ls.str() + ".png"]);
-		hope_shadow_med_positions.push_back(assets["hope_model_shadow_med__00" + ls.str() + ".png"]);
-		hope_shadow_lo_positions.push_back(assets["hope_model_shadow_lo__00" + ls.str() + ".png"]);
-	}
+	struct model m_tree;
+	model_init(&m_tree, &bf_assets, tree_file_prefixes, 1, MT_STATIC_ASSET, 1, 36, 1 / 4.0f, struct vector3<unsigned int>(512, 512, 1), 1 / 4.0f, struct vector3<unsigned int>(512, 512, 1), struct vector2<unsigned int>(10, 20));
+	models.push_back(m_tree);
+	//
+	
+	//colt model
+	vector<string> colt_file_prefixes;
+	colt_file_prefixes.push_back("colt_model_hi__00");
+	colt_file_prefixes.push_back("colt_model_med__00");
+	colt_file_prefixes.push_back("colt_model_lo__00");
+	colt_file_prefixes.push_back("colt_model_shadow_hi__00");
+	colt_file_prefixes.push_back("colt_model_shadow_med__00");
+	colt_file_prefixes.push_back("colt_model_shadow_lo__00");
 
-	pm_hope.id = 0;
-	pm_hope.model_scale = 1 / 8.0f;
-	pm_hope.model_dimensions = { 256, 256, 1 };
-	pm_hope.model_positions = bit_field_add_bulk(&bf_assets, hope_model_positions.data(), 36, 36*sizeof(unsigned int))+1;
-	pm_hope.model_med_positions = bit_field_add_bulk(&bf_assets, hope_model_med_positions.data(), 36, 36 * sizeof(unsigned int)) + 1;
-	pm_hope.model_lo_positions = bit_field_add_bulk(&bf_assets, hope_model_lo_positions.data(), 36, 36 * sizeof(unsigned int)) + 1;
-	pm_hope.shadow_scale = 1 / 8.0f;
-	pm_hope.shadow_dimensions = { 256, 256, 1 };
-	pm_hope.shadow_offset = { 2, 9 };
-	pm_hope.shadow_positions = bit_field_add_bulk(&bf_assets, hope_shadow_positions.data(), 36, 36*sizeof(unsigned int))+1;
-	pm_hope.shadow_med_positions = bit_field_add_bulk(&bf_assets, hope_shadow_med_positions.data(), 36, 36 * sizeof(unsigned int)) + 1;
-	pm_hope.shadow_lo_positions = bit_field_add_bulk(&bf_assets, hope_shadow_lo_positions.data(), 36, 36 * sizeof(unsigned int)) + 1;
-	player_models.push_back(pm_hope);
-
-	unsigned int player_model_info_size_in_bf = (unsigned int)(player_models.size() * ceilf(sizeof(struct player_model) / (float) sizeof(unsigned int)));
-	unsigned int player_model_info_position = bit_field_add_bulk_zero(&bf_assets, player_model_info_size_in_bf)+1;
-	struct player_model* player_models_ptr = (struct player_model*) &bf_assets.data[player_model_info_position];
-	memcpy(player_models_ptr, player_models.data(), player_models.size() * sizeof(struct player_model));
+	struct model m_colt;
+	model_init(&m_colt, &bf_assets, colt_file_prefixes, 2, MT_LOOTABLE_ITEM, 1, 36, 1/ 16.0f, struct vector3<unsigned int>(256, 256, 1), 1 / 16.0f, struct vector3<unsigned int>(256, 256, 1), struct vector2<unsigned int>(3, 4));
+	models.push_back(m_colt);
+	//
+	
+	unsigned int models_size_in_bf = (unsigned int)(models.size() * ceilf(ceilf(sizeof(struct model) / (float)sizeof(unsigned int))));
+	unsigned int models_position = bit_field_add_bulk_zero(&bf_assets, models_size_in_bf) + 1;
+	struct model* models_ptr = (struct model*) & bf_assets.data[models_position];
+	memcpy(models_ptr, models.data(), models.size() * sizeof(struct model));
 
 	bit_field_update_device(&bf_assets, 0);
 
@@ -106,27 +113,36 @@ int main(int argc, char** argv) {
 
 	srand(time(nullptr));
 	vector<struct player> v_pl;
-	struct vector3<float> position_max;
 	for (int i = 0; i < 512; i++) {
 		stringstream ss_p;
 		ss_p << i;
-		player_add("mur1_" + ss_p.str(), PT_HOPE);
+		player_add("mur1_" + ss_p.str(), PT_HOPE, 0);
 		players["mur1_" + ss_p.str()].position = { 10.0f + rand() % (map_dimensions[0] - 32), 10.0f + rand() % (map_dimensions[1] - 32), 0.0f };
-		players["mur1_" + ss_p.str()].model_id = 0;
 		
-		position_max[0] = max((float)((pm_hope.shadow_offset[0] + pm_hope.shadow_dimensions[0])), (float)(pm_hope.model_dimensions[0]));
-		position_max[1] = max((float)((pm_hope.shadow_offset[1] + pm_hope.shadow_dimensions[1])), (float)(pm_hope.model_dimensions[1]));
-		position_max[2] = 0.0f;
-		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, players["mur1_" + ss_p.str()].position, { pm_hope.model_scale, pm_hope.model_scale, 1.0f }, {0.0f, 0.0f, 0.0f}, position_max, i);
-		int grid_index = grid_get_index(bf_rw.data, gd.position_in_bf, players["mur1_" + ss_p.str()].position);
-		int data_pos = bf_rw.data[gd.data_position_in_bf + 1 + grid_index];
-		int count = bf_rw.data[data_pos];
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, players["mur1_" + ss_p.str()].position, { m_hope.model_scale, m_hope.model_scale, 1.0f }, {0.0f, 0.0f, 0.0f}, model_get_max_position(&m_hope), i);
 		v_pl.emplace_back(players["mur1_" + ss_p.str()]);
 	}
-	unsigned int players_size_in_bf = players.size() * (int)ceilf(sizeof(struct player) / (float)sizeof(unsigned int));
+	for (int i = 0; i < 20; i++) {
+		stringstream ss_p;
+		ss_p << i;
+		player_add("tree_" + ss_p.str(), PT_HOPE, 1);
+		players["tree_" + ss_p.str()].position = { 200.0f + (i % 10)* 100, 200.0f + (i / 10) * 100, 0.0f };
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, players["tree_" + ss_p.str()].position, { m_tree.model_scale, m_tree.model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&m_tree), 512+i);
+		v_pl.emplace_back(players["tree_" + ss_p.str()]);
+	}
+	for (int i = 0; i < 20; i++) {
+		stringstream ss_p;
+		ss_p << i;
+		player_add("colt_" + ss_p.str(), PT_HOPE, 2);
+		players["colt_" + ss_p.str()].position = { 450.0f + (i % 10) * 100, 450.0f + (i / 10) * 100, 0.0f };
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, players["colt_" + ss_p.str()].position, { m_colt.model_scale, m_colt.model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&m_colt), 512 + 20 + i);
+		v_pl.emplace_back(players["colt_" + ss_p.str()]);
+	}
+
+	unsigned int players_size_in_bf = v_pl.size() * (int)ceilf(sizeof(struct player) / (float)sizeof(unsigned int));
 	unsigned int players_position = bit_field_add_bulk_zero(&bf_rw, players_size_in_bf)+1;
 	struct player* players_ptr = (struct player *) &bf_rw.data[players_position];
-	memcpy(players_ptr, v_pl.data(), players.size() * sizeof(struct player));
+	memcpy(players_ptr, v_pl.data(), v_pl.size() * sizeof(struct player));
 	
 	bit_field_update_device(&bf_rw, 0);
 
@@ -198,7 +214,7 @@ int main(int argc, char** argv) {
 		}
 
 		for (int p = 0; p < 512; p++) {
-			grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, players_ptr[p].position, { pm_hope.model_scale, pm_hope.model_scale, 1.0f }, {0.0f, 0.0f, 0.0f}, position_max, p);
+			grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, players_ptr[p].position, { m_hope.model_scale, m_hope.model_scale, 1.0f }, {0.0f, 0.0f, 0.0f}, model_get_max_position(&m_hope), p);
 		}
 		for (int p = 0; p < 512; p++) {
 				float rand_dir = (rand() / (float)RAND_MAX - 0.5f) * 2;
@@ -212,11 +228,11 @@ int main(int argc, char** argv) {
 				players_ptr[p].orientation += (rand_dir - 0.5);
 				if (players_ptr[p].orientation < 0) players_ptr[p].orientation += 360;
 				//players_ptr[0].position[0] += 0.05f;
-				position_max[0] = max((float)((pm_hope.shadow_offset[0] + pm_hope.shadow_dimensions[0])), (float)(pm_hope.model_dimensions[0]));
-				position_max[1] = max((float)((pm_hope.shadow_offset[1] + pm_hope.shadow_dimensions[1])), (float)(pm_hope.model_dimensions[1]));
-				position_max[2] = 0.0f;
-				grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, players_ptr[p].position, { pm_hope.model_scale, pm_hope.model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, position_max, p);
+				grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, players_ptr[p].position, { m_hope.model_scale, m_hope.model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&m_hope), p);
 				players_ptr = (struct player*) &bf_rw.data[players_position];
+		}
+		for (int p = 512 + 20; p < 512 + 20 + 20; p++) {
+			players_ptr[p].orientation += 1;
 		}
 		
 		bit_field_invalidate_bulk(&bf_rw, players_position, players_size_in_bf);
@@ -224,7 +240,7 @@ int main(int argc, char** argv) {
 
 		launch_resize(bf_assets.device_data[0], assets["map_0.png"], map_dimensions[0], map_dimensions[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
 
-		launch_draw_players_kernel(bf_assets.device_data[0], player_model_info_position,
+		launch_draw_players_kernel(bf_assets.device_data[0], models_position,
 			bf_rw.device_data[0], players_position, gd.position_in_bf, gd.data_position_in_bf,
 			bf_output.device_data[0], output_position, resolution[0], resolution[1], 4,
 			camera_crop[0], camera_crop[2], camera[2], tick_counter);

@@ -45,28 +45,9 @@ struct player {
 	unsigned int model_id;
 };
 
-struct player_model {
-	unsigned int id;
-
-	float model_scale;
-	unsigned int model_positions;
-
-	struct vector3<unsigned int> model_dimensions;
-	unsigned int model_med_positions;
-	unsigned int model_lo_positions;
-
-
-	float shadow_scale;
-	struct vector3<unsigned int> shadow_dimensions;
-	struct vector2<unsigned int> shadow_offset;
-	unsigned int shadow_positions;
-	unsigned int shadow_med_positions;
-	unsigned int shadow_lo_positions;
-};
-
 extern map<string, struct player> players;
 
-void player_add(string name, enum player_type pt);
+void player_add(string name, enum player_type pt, unsigned int model_id);
 void player_type_change(string name, enum player_type pt);
 
 #endif

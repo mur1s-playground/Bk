@@ -6,7 +6,7 @@
 
 map<string, struct player> players;
 
-void player_add(string name, enum player_type pt) {
+void player_add(string name, enum player_type pt, unsigned int model_id) {
     map<string, struct player>::iterator it = players.find(name);
     if (it != players.end()) {
     } else {
@@ -24,6 +24,7 @@ void player_add(string name, enum player_type pt) {
         p.player_stance = PS_WALKING;
         p.player_action = PA_NONE;
         p.orientation = (float)(rand() % 360);
+        p.model_id = model_id;
         players.try_emplace(name, p);
     }
 }

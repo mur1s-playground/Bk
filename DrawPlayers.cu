@@ -3,6 +3,7 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
+#include "Model.hpp"
 #include "Player.hpp"
 #include "Grid.hpp"
 
@@ -85,7 +86,7 @@ __global__ void draw_players_kernel(
 
     unsigned int players_count = device_data_players[players_position-1] / (unsigned int)ceilf(sizeof(struct player) / (float)sizeof(unsigned int));
     struct player* players = (struct player*) &device_data_players[players_position];
-    struct player_model* player_models = (struct player_model*) &device_data_assets[players_models_position];
+    struct model* player_models = (struct model*) &device_data_assets[players_models_position];
 
     if (i < output_width * output_height * output_channels) {
         int current_channel = i / (output_width * output_height);
@@ -101,14 +102,14 @@ __global__ void draw_players_kernel(
         
 
         unsigned char* output = (unsigned char*)&device_data_output[output_position];
-        /*
-        if ((int)(current_game_x) % 32 == 0 || (int)(current_game_y) % 32 == 0) {
+        
+        /*if ((int)(current_game_x) % 32 == 0 || (int)(current_game_y) % 32 == 0) {
             output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
             output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255;
             output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255;
             output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 255;
-        }
-        */
+        }*/
+        
         int grid_current_idx = grid_get_index(device_data_players, gd_position_in_bf, struct vector3<float> (current_game_x, current_game_y, 0.0f));
         if (grid_current_idx != -1) {
             unsigned int entities_iddata_position = device_data_players[gd_data_position_in_bf + 1 + grid_current_idx];
@@ -118,13 +119,22 @@ __global__ void draw_players_kernel(
                 for (int e = 0; e < entities_count; e++) {
                     unsigned int entity_id = device_data_players[entities_iddata_position + 1 + e];
                     if (entity_id < UINT_MAX) {
+                        
+                        /*
+                        if ((int)(current_game_x) % 32 == 0 || (int)(current_game_y) % 32 == 0) {
+                            output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
+                            output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255 * (e + 1 % 2);
+                            output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255 * (e % 2);
+                            output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
+                        }
+                        */
                         /*
                         output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
                         output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255 * (e+1 % 2);
                         output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255 * (e % 2);
                         output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
                         */
-                        struct player_model* pm = &player_models[players[entity_id].model_id];
+                        struct model* pm = &player_models[players[entity_id].model_id];
 
                         unsigned int shadow_positions = pm->shadow_positions;
                         float down_scale = 1;
@@ -172,13 +182,12 @@ __global__ void draw_players_kernel(
                         }
                     }
                 }
-                /*
                 float player_y_max = -1.0f;
                 int player_id_max = -1;
                 for (int e = 0; e < entities_count; e++) {
                     unsigned int entity_id = device_data_players[entities_iddata_position + 1 + e];
                     if (entity_id < UINT_MAX) {
-                        struct player_model* pm = &player_models[players[entity_id].model_id];
+                        struct model* pm = &player_models[players[entity_id].model_id];
                         unsigned int model_positions = pm->model_positions;
                         float down_scale = 1;
                         if (camera_z / pm->model_scale > 2) {
@@ -200,6 +209,13 @@ __global__ void draw_players_kernel(
 
                             unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_positions];
                             unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[(int)(players[entity_id].orientation / 10) % 36]];
+
+                            if (pm->mt == MT_LOOTABLE_ITEM) {
+                                if (offset_to_player_base_x <= 20 * camera_z || offset_to_player_base_y <= 20 * camera_z || offset_to_player_base_x >= pm->model_dimensions[0] / down_scale - (20 * camera_z) || offset_to_player_base_y >= pm->model_dimensions[1] / down_scale - (20 * camera_z)) {
+                                    float alpha_item = 150;
+                                    output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = (unsigned char)(((255 - alpha_item) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (alpha_item / 255.0f) * 255));
+                                }
+                            }
 
                             for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
                                 for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
@@ -210,10 +226,12 @@ __global__ void draw_players_kernel(
                                         float model_palette_idx_y = offset_to_player_base_y + s_y;
 
                                         float interpixel_alpha = getInterpixel(p_model, pm->model_dimensions[0] / down_scale, pm->model_dimensions[1] / down_scale, 4, model_palette_idx_x, model_palette_idx_y, 3);
-                                        if (interpixel_alpha >= 128) {
-                                            if (players[entity_id].position[1] > player_y_max) {
-                                                player_y_max = players[entity_id].position[1];
+                                        if (interpixel_alpha >= 64) {
+                                            if (players[entity_id].position[1]+(pm->model_dimensions[1]*pm->model_scale) > player_y_max) {
+                                                player_y_max = players[entity_id].position[1]+ (pm->model_dimensions[1] * pm->model_scale);
                                                 player_id_max = entity_id;
+                                                s_y = sampling_filter_dim;
+                                                s_x = sampling_filter_dim;
                                             }
                                         }
                                     }
@@ -222,12 +240,12 @@ __global__ void draw_players_kernel(
                         }
                     }
                 }
-                */
-                //if (player_id_max >= 0) {
-                for (int e = 0; e < entities_count; e++) {
-                    unsigned int entity_id = device_data_players[entities_iddata_position + 1 + e];
-                    if (entity_id < UINT_MAX) {
-                        struct player_model* pm = &player_models[players[entity_id].model_id];
+                
+                if (player_id_max >= 0) {
+                //for (int e = 0; e < entities_count; e++) {
+                    //unsigned int entity_id = device_data_players[entities_iddata_position + 1 + e];
+                    //if (entity_id < UINT_MAX) {
+                        struct model* pm = &player_models[players[player_id_max].model_id];
                         unsigned int model_positions = pm->model_positions;
                         float down_scale = 1;
                         if (camera_z / pm->model_scale > 2) {
@@ -241,14 +259,14 @@ __global__ void draw_players_kernel(
 
                         sampling_filter_dim = ceilf(camera_z / (pm->model_scale * down_scale));
 
-                        float offset_to_player_base_x = (current_game_x - (players[entity_id].position[0])) / (pm->model_scale * down_scale);
-                        float offset_to_player_base_y = (current_game_y - (players[entity_id].position[1])) / (pm->model_scale * down_scale);
+                        float offset_to_player_base_x = (current_game_x - (players[player_id_max].position[0])) / (pm->model_scale * down_scale);
+                        float offset_to_player_base_y = (current_game_y - (players[player_id_max].position[1])) / (pm->model_scale * down_scale);
 
                         if (offset_to_player_base_x >= 1 && offset_to_player_base_x < pm->model_dimensions[0] / down_scale - 1 &&
                             offset_to_player_base_y >= 1 && offset_to_player_base_y < pm->model_dimensions[1] / down_scale - 1) {
 
                             unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_positions];
-                            unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[(int)(players[entity_id].orientation / 10) % 36]];
+                            unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[(int)(players[player_id_max].orientation / 10) % 36]];
 
                             //enum player_stance p_stance = players[p].player_stance;
                             //enum player_action p_action = players[p].player_action;
@@ -271,7 +289,7 @@ __global__ void draw_players_kernel(
                                 }
                             }
                         }
-                    }
+                    //}
                 }
             }
         }

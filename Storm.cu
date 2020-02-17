@@ -38,12 +38,13 @@ __global__ void draw_storm_kernel(unsigned int *device_output_data, const unsign
 			frame[current_y * (width * channels) + current_x * channels + 1] = (255 - storm_alpha) / 255.0f * frame[current_y * (width * channels) + current_x * channels + 1] + (storm_alpha / 255.0f) * storm_color[1];
 			frame[current_y * (width * channels) + current_x * channels + 2] = (255 - storm_alpha) / 255.0f * frame[current_y * (width * channels) + current_x * channels + 2] + (storm_alpha / 255.0f) * storm_color[2];
 		}
-		if (sqrtf((camera_crop_x1 + current_x * camera_z - storm_to.x) * (camera_crop_x1 + current_x * camera_z - storm_to.x) + (camera_crop_y1 + current_y * camera_z - storm_to.y) * (camera_crop_y1 + current_y * camera_z - storm_to.y)) >= storm_to.radius-1.0f &&
-			sqrtf((camera_crop_x1 + current_x * camera_z - storm_to.x) * (camera_crop_x1 + current_x * camera_z - storm_to.x) + (camera_crop_y1 + current_y * camera_z - storm_to.y) * (camera_crop_y1 + current_y * camera_z - storm_to.y)) <= storm_to.radius+1.0f
+		unsigned int storm_circle_alpha = 150;
+		if (sqrtf((camera_crop_x1 + current_x * camera_z - storm_to.x) * (camera_crop_x1 + current_x * camera_z - storm_to.x) + (camera_crop_y1 + current_y * camera_z - storm_to.y) * (camera_crop_y1 + current_y * camera_z - storm_to.y)) >= storm_to.radius-2.0f &&
+			sqrtf((camera_crop_x1 + current_x * camera_z - storm_to.x) * (camera_crop_x1 + current_x * camera_z - storm_to.x) + (camera_crop_y1 + current_y * camera_z - storm_to.y) * (camera_crop_y1 + current_y * camera_z - storm_to.y)) <= storm_to.radius+2.0f
 			) {
-			frame[current_y * (width * channels) + current_x * channels] = (255 - storm_alpha) / 255.0f * frame[current_y * (width * channels) + current_x * channels] + (storm_alpha / 255.0f) * 255;
-			frame[current_y * (width * channels) + current_x * channels + 1] = (255 - storm_alpha) / 255.0f * frame[current_y * (width * channels) + current_x * channels + 1] + (storm_alpha / 255.0f) * 255;
-			frame[current_y * (width * channels) + current_x * channels + 2] = (255 - storm_alpha) / 255.0f * frame[current_y * (width * channels) + current_x * channels + 2] + (storm_alpha / 255.0f) * 255;
+			frame[current_y * (width * channels) + current_x * channels] = (255 - storm_circle_alpha) / 255.0f * frame[current_y * (width * channels) + current_x * channels] + (storm_circle_alpha / 255.0f) * 255;
+			frame[current_y * (width * channels) + current_x * channels + 1] = (255 - storm_circle_alpha) / 255.0f * frame[current_y * (width * channels) + current_x * channels + 1] + (storm_circle_alpha / 255.0f) * 255;
+			frame[current_y * (width * channels) + current_x * channels + 2] = (255 - storm_circle_alpha) / 255.0f * frame[current_y * (width * channels) + current_x * channels + 2] + (storm_circle_alpha / 255.0f) * 255;
 		}
 	}
 }
@@ -82,8 +83,6 @@ void storm_init() {
 	float storm_radius = std::min(map_dimensions[0], map_dimensions[1]) * storm_phase_mapratio[0]/2.0f;
 	int storm_center_max_x = (int)floorf(std::max<float>(map_dimensions[0] - storm_radius, 0.0f));
 	int storm_center_max_y = (int)floorf(std::max<float>(map_dimensions[1] - storm_radius, 0.0f));
-
-	std::srand(std::time(nullptr));
 	
 	storm_current.x = (unsigned int)map_dimensions[0] / 2.0f;
 	storm_current.y = (unsigned int)map_dimensions[1] / 2.0f;
@@ -104,8 +103,6 @@ void storm_next() {
 			storm_phase_time = 0;
 			storm_current = storm_to;
 			storm_last = storm_current;
-
-			std::srand(std::time(nullptr));
 
 			float storm_radius_new = std::min(map_dimensions[0], map_dimensions[1]) * storm_phase_mapratio[storm_phase_current] / 2.0f;
 			float max_dist_from_last_center = storm_last.radius - storm_radius_new;

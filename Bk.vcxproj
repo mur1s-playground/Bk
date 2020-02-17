@@ -85,6 +85,7 @@
     <ClCompile Include="BitField.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Model.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="SDLShow.cpp" />
     <ClCompile Include="Util.cpp" />
@@ -97,6 +98,7 @@
     <ClInclude Include="DrawPlayers.hpp" />
     <ClInclude Include="Grid.hpp" />
     <ClInclude Include="Main.hpp" />
+    <ClInclude Include="Model.hpp" />
     <ClInclude Include="Player.hpp" />
     <ClInclude Include="Resize.hpp" />
     <ClInclude Include="SDLShow.hpp" />
