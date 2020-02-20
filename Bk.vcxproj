@@ -66,15 +66,15 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(CudaToolkitIncludeDir);;C:\Users\mur1_\Downloads\OpenCV_4.1.2\opencv\build\include;C:\Users\mur1_\Downloads\SDL2-devel-2.0.10-VC\SDL2-2.0.10\include;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(CudaToolkitIncludeDir);C:\Users\mur1_\Downloads\SDL2-devel-2.0.10-VC\SDL2-2.0.10\include;</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);opencv_world412.lib;msvcrt.lib;SDL2.lib;SDL2main.lib;</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories);$(CudaToolkitLibDir);C:\Users\mur1_\Downloads\OpenCV_4.1.2\opencv\build\x64\vc15\lib;C:\Users\mur1_\Downloads\SDL2-devel-2.0.10-VC\SDL2-2.0.10\lib\x64;C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.24.28314\lib\x64;</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);msvcrt.lib;SDL2.lib;SDL2main.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories);$(CudaToolkitLibDir);C:\Users\mur1_\Downloads\SDL2-devel-2.0.10-VC\SDL2-2.0.10\lib\x64;C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.24.28314\lib\x64;</AdditionalLibraryDirectories>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
@@ -84,6 +84,8 @@
     <ClCompile Include="AssetLoader.cpp" />
     <ClCompile Include="BitField.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="Item.cpp" />
+    <ClCompile Include="lodepng.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="Player.cpp" />
@@ -96,8 +98,12 @@
     <ClInclude Include="Camera.hpp" />
     <ClInclude Include="Copy.hpp" />
     <ClInclude Include="DrawPlayers.hpp" />
+    <ClInclude Include="Entity.hpp" />
     <ClInclude Include="Grid.hpp" />
+    <ClInclude Include="Item.hpp" />
+    <ClInclude Include="lodepng.h" />
     <ClInclude Include="Main.hpp" />
+    <ClInclude Include="Map.hpp" />
     <ClInclude Include="Model.hpp" />
     <ClInclude Include="Player.hpp" />
     <ClInclude Include="Resize.hpp" />
@@ -110,6 +116,8 @@
   <ItemGroup>
     <CudaCompile Include="Copy.cu" />
     <CudaCompile Include="DrawPlayers.cu" />
+    <CudaCompile Include="Entity.cu" />
+    <CudaCompile Include="Map.cu" />
     <CudaCompile Include="Resize.cu" />
     <CudaCompile Include="Storm.cu" />
   </ItemGroup>

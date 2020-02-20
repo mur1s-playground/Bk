@@ -18,7 +18,9 @@ void sdl_show_window() {
 	SDL_CreateWindowAndRenderer(0, 0, SDL_WINDOW_FULLSCREEN_DESKTOP, &sdlWindow, &sdlRenderer);
 
 	sdlTexture = SDL_CreateTexture(sdlRenderer,
-		SDL_PIXELFORMAT_ARGB8888,
+		//SDL_PIXELFORMAT_ARGB8888,
+		//SDL_PIXELFORMAT_RGBA8888,
+		SDL_PIXELFORMAT_ABGR8888,
 		SDL_TEXTUREACCESS_STREAMING,
 		resolution[0], resolution[1]);
 	SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);

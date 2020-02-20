@@ -3,8 +3,44 @@
 #include <vector>
 #include <random>
 #include <ctime>
+#include <sstream>
+#include "Util.hpp"
+#include "Model.hpp"
+#include "AssetLoader.hpp"
+
+unsigned int                    player_models_position;
+map<player_type, struct model>  player_models;
 
 map<string, struct player> players;
+
+void player_models_init(struct bit_field* bf_assets) {
+    vector<string> model_cfgs = get_all_files_names_within_folder("./players", "*", "cfg");
+    vector<struct model> pms, pms_sorted;
+    for (int i = 0; i < model_cfgs.size(); i++) {
+        struct model m = model_from_cfg(bf_assets, "./players/", model_cfgs[i]);
+        if (model_cfgs[i].substr(0, model_cfgs[i].find_last_of('.')) == "hope") {
+            player_models.try_emplace(PT_HOPE, m);
+            pms.push_back(m);
+        }
+    }
+    int counter = 0;
+    struct model empty_model;
+    empty_model.id = UINT_MAX;
+    while (counter < pms.size()) {
+        for (int i = 0; i < pms.size(); i++) {
+            if (pms[i].id == counter) {
+                pms_sorted.push_back(pms[i]);
+            }
+        }
+        if (pms_sorted.size() < counter + 1) {
+            pms_sorted.push_back(empty_model);
+        }
+        counter++;
+    }
+    unsigned int size = pms_sorted.size() * sizeof(struct model);
+    unsigned int size_in_bf = (unsigned int)ceilf(size/(float)sizeof(unsigned int));
+    player_models_position = bit_field_add_bulk(bf_assets, (unsigned int*)pms_sorted.data(), size, size_in_bf)+1;
+}
 
 void player_add(string name, enum player_type pt, unsigned int model_id) {
     map<string, struct player>::iterator it = players.find(name);

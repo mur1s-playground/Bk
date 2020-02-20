@@ -1,6 +1,7 @@
 #include "Storm.hpp"
 
 #include "Main.hpp"
+#include "Map.hpp"
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -63,7 +64,9 @@ void launch_draw_storm_kernel(unsigned int* device_output_data, const unsigned i
 	}
 }
 
-void storm_init() {
+void storm_init(struct bit_field* bf_map, struct bit_field* bf_rw) {
+	gm.map_storm_pathing = bit_field_add_bulk_zero(bf_rw, (unsigned int)ceilf(gm.map_dimensions[0]*gm.map_dimensions[1]*2)/(float)sizeof(unsigned int))+1;
+
 	storm_phase_start_ticks.emplace_back(1800);
 	storm_phase_duration_ticks.emplace_back(1800);
 	storm_phase_mapratio.emplace_back(0.75f);
@@ -80,22 +83,28 @@ void storm_init() {
 	storm_phase_duration_ticks.emplace_back(1800);
 	storm_phase_mapratio.emplace_back(0.0f);
 
-	float storm_radius = std::min(map_dimensions[0], map_dimensions[1]) * storm_phase_mapratio[0]/2.0f;
-	int storm_center_max_x = (int)floorf(std::max<float>(map_dimensions[0] - storm_radius, 0.0f));
-	int storm_center_max_y = (int)floorf(std::max<float>(map_dimensions[1] - storm_radius, 0.0f));
+	float storm_radius = std::min(gm.map_dimensions[0], gm.map_dimensions[1]) * storm_phase_mapratio[0]/2.0f;
+	int storm_center_max_x = (int)floorf(std::max<float>(gm.map_dimensions[0] - storm_radius, 0.0f));
+	int storm_center_max_y = (int)floorf(std::max<float>(gm.map_dimensions[1] - storm_radius, 0.0f));
 	
-	storm_current.x = (unsigned int)map_dimensions[0] / 2.0f;
-	storm_current.y = (unsigned int)map_dimensions[1] / 2.0f;
-	storm_current.radius = floorf(std::max<float>(map_dimensions[0], map_dimensions[1]) * std::sqrtf(2)/2.0f);
+	storm_current.x = (unsigned int)gm.map_dimensions[0] / 2.0f;
+	storm_current.y = (unsigned int)gm.map_dimensions[1] / 2.0f;
+	storm_current.radius = floorf(std::max<float>(gm.map_dimensions[0], gm.map_dimensions[1]) * std::sqrtf(2)/2.0f);
 	storm_last.x = storm_current.x;
 	storm_last.y = storm_current.y;
 	storm_last.radius = storm_current.radius;
-	storm_to.x = (unsigned int) storm_radius + (rand() % (int)(storm_center_max_x - storm_radius));
-	storm_to.y = (unsigned int) storm_radius + (rand() % (int)(storm_center_max_y - storm_radius));
+	bool pathable_target = false;
+	while (!pathable_target) {
+		storm_to.x = (unsigned int)storm_radius + (rand() % (int)(storm_center_max_x - storm_radius));
+		storm_to.y = (unsigned int)storm_radius + (rand() % (int)(storm_center_max_y - storm_radius));
+		if (bf_map->data[gm.map_pathable_position + (storm_to.y) * gm.map_dimensions[0] + (storm_to.x)] > 0) {
+			pathable_target = true;
+		}
+	}
 	storm_to.radius = storm_radius;
 }
 
-void storm_next() {
+void storm_next(struct bit_field* bf_map, struct bit_field* bf_rw) {
 	storm_phase_time++;
 	if (storm_phase_time == storm_phase_start_ticks[storm_phase_current] + storm_phase_duration_ticks[storm_phase_current]) {
 		if (storm_phase_current + 1 < storm_phase_start_ticks.size()) {
@@ -104,13 +113,19 @@ void storm_next() {
 			storm_current = storm_to;
 			storm_last = storm_current;
 
-			float storm_radius_new = std::min(map_dimensions[0], map_dimensions[1]) * storm_phase_mapratio[storm_phase_current] / 2.0f;
+			float storm_radius_new = std::min(gm.map_dimensions[0], gm.map_dimensions[1]) * storm_phase_mapratio[storm_phase_current] / 2.0f;
 			float max_dist_from_last_center = storm_last.radius - storm_radius_new;
-			float rand_dist = std::rand() / (float)RAND_MAX * max_dist_from_last_center;
-			float rand_angle = std::rand() / (float)RAND_MAX * 2 * std::_Pi;
 
-			storm_to.x = (unsigned int)(storm_last.x + rand_dist * std::cosf(rand_angle));
-			storm_to.y = (unsigned int)(storm_last.y + rand_dist * std::sinf(rand_angle));
+			bool pathable_target = false;
+			while (!pathable_target) {
+				float rand_dist = std::rand() / (float)RAND_MAX * max_dist_from_last_center;
+				float rand_angle = std::rand() / (float)RAND_MAX * 2 * std::_Pi;
+				storm_to.x = (unsigned int)(storm_last.x + rand_dist * std::cosf(rand_angle));
+				storm_to.y = (unsigned int)(storm_last.y + rand_dist * std::sinf(rand_angle));
+				if (bf_map->data[gm.map_pathable_position + (storm_to.y) * gm.map_dimensions[0] + (storm_to.x)] > 0) {
+					pathable_target = true;
+				}
+			}
 			storm_to.radius = storm_radius_new;
 		}
 	}

@@ -76,7 +76,7 @@ __device__ float getInterpixel(const unsigned char* frame, const unsigned int wi
     float value = m_0 * value_components[0] + m_1 * value_components[1] + m_2 * value_components[2] + m_3 * value_components[3];
     return value;
 }
-
+/*
 __global__ void draw_players_kernel(
         const unsigned int* device_data_assets, const unsigned int players_models_position,
         const unsigned int* device_data_players, const unsigned int players_position, const unsigned int gd_position_in_bf, const unsigned int gd_data_position_in_bf,
@@ -109,7 +109,7 @@ __global__ void draw_players_kernel(
             output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255;
             output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 255;
         }*/
-        
+        /*
         int grid_current_idx = grid_get_index(device_data_players, gd_position_in_bf, struct vector3<float> (current_game_x, current_game_y, 0.0f));
         if (grid_current_idx != -1) {
             unsigned int entities_iddata_position = device_data_players[gd_data_position_in_bf + 1 + grid_current_idx];
@@ -133,7 +133,7 @@ __global__ void draw_players_kernel(
                         output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255 * (e+1 % 2);
                         output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255 * (e % 2);
                         output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
-                        */
+                        *//*
                         struct model* pm = &player_models[players[entity_id].model_id];
 
                         unsigned int shadow_positions = pm->shadow_positions;
@@ -295,6 +295,7 @@ __global__ void draw_players_kernel(
         }
     }
 }
+*/
 
 void launch_draw_players_kernel(const unsigned int* device_data_assets, const unsigned int players_models_position,
     const unsigned int* device_data_players, const unsigned int players_position, const unsigned int gd_position_in_bf, const unsigned int gd_data_position_in_bf,
@@ -306,7 +307,7 @@ void launch_draw_players_kernel(const unsigned int* device_data_assets, const un
     int threadsPerBlock = 256;
     int blocksPerGrid = (output_width * output_height * 3 + threadsPerBlock - 1) / threadsPerBlock;
 
-    draw_players_kernel<<<blocksPerGrid, threadsPerBlock>>>(device_data_assets, players_models_position, device_data_players, players_position, gd_position_in_bf, gd_data_position_in_bf, device_data_output, output_position, output_width, output_height, output_channels, camera_x1, camera_y1, camera_z, tick_counter);
+   // draw_players_kernel<<<blocksPerGrid, threadsPerBlock>>>(device_data_assets, players_models_position, device_data_players, players_position, gd_position_in_bf, gd_data_position_in_bf, device_data_output, output_position, output_width, output_height, output_channels, camera_x1, camera_y1, camera_z, tick_counter);
     err = cudaGetLastError();
 
     if (err != cudaSuccess) {
