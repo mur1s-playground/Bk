@@ -250,7 +250,7 @@ __global__ void draw_entities_kernel(
                             unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[(int)(entities[entity_id].orientation / 10) % 36]];
 
                             if (m->mt == MT_LOOTABLE_ITEM) {
-                                if (offset_to_model_base_x <= 20 * camera_z || offset_to_model_base_y <= 20 * camera_z || offset_to_model_base_x >= m->model_dimensions[0] * upscale_fac - (20 * camera_z) || offset_to_model_base_y >= m->model_dimensions[1] * upscale_fac - (20 * camera_z)) {
+                                if (offset_to_model_base_x <= 22 * camera_z || offset_to_model_base_y <= 22 * camera_z || offset_to_model_base_x >= m->model_dimensions[0] * upscale_fac - (22 * camera_z) || offset_to_model_base_y >= m->model_dimensions[1] * upscale_fac - (22 * camera_z)) {
                                     float alpha_item = 150;
                                     output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = (unsigned char)(((255 - alpha_item) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (alpha_item / 255.0f) * 255));
                                 }

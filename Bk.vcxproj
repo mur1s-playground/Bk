@@ -106,6 +106,7 @@
     <ClInclude Include="Player.hpp" />
     <ClInclude Include="SDLShow.hpp" />
     <ClInclude Include="Storm.hpp" />
+    <ClInclude Include="UI.hpp" />
     <ClInclude Include="Util.hpp" />
     <ClInclude Include="Vector2.hpp" />
     <ClInclude Include="Vector3.hpp" />
@@ -114,6 +115,7 @@
     <CudaCompile Include="Entity.cu" />
     <CudaCompile Include="Map.cu" />
     <CudaCompile Include="Storm.cu" />
+    <CudaCompile Include="UI.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

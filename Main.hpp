@@ -14,4 +14,6 @@ extern struct bit_field bf_output;
 extern struct vector3<float> camera;
 extern struct vector2<unsigned int> resolution;
 
+extern int target_ticks_per_second;
+
 #endif

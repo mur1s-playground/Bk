@@ -4,6 +4,7 @@
 
 #include "BitField.hpp"
 #include "AssetLoader.hpp"
+#include "UI.hpp"
 #include "Map.hpp"
 #include "Grid.hpp"
 #include "Camera.hpp"
@@ -15,6 +16,8 @@
 #include "math.h"
 
 #include <ctime>
+#include <chrono>
+#include <thread>
 #include <random>
 
 
@@ -29,6 +32,7 @@ struct vector2<unsigned int> resolution;
 
 struct vector2<unsigned int> map_dimensions;
 
+int target_ticks_per_second = 30;
 unsigned int tick_counter = 0;
 
 int main(int argc, char** argv) {
@@ -46,6 +50,11 @@ int main(int argc, char** argv) {
 	//bit field uploaded once
 	bit_field_init(&bf_assets, 16, 1024);
 	bit_field_register_device(&bf_assets, 0);
+
+	// -- UI -- //
+
+	ui_init(&bf_assets);
+	ui_set_active("main_menu");
 
 	// -- MAPS -- //
 
@@ -191,59 +200,87 @@ int main(int argc, char** argv) {
 	double sec = 0;
 
 	bool running = true;
+	bool game_started = false;
+
+	int frame_balancing = (int)floorf(1000.0f/(float)target_ticks_per_second);
+	long tf = clock();
 	while (running) {
-		long tf = clock();
 		long tf_l = clock();
 
 		while (SDL_PollEvent(&sdl_event) != 0) {
-			if (sdl_event.type == SDL_KEYDOWN && sdl_event.key.keysym.sym == SDLK_ESCAPE) {
-				running = false;
-			}
+			if (game_started) {
+				if (sdl_event.type == SDL_KEYDOWN && sdl_event.key.keysym.sym == SDLK_ESCAPE) {
+					ui_set_active("ingame_menu");
+				}
 
-			float camera_delta_z = 0.0f;
-			if (sdl_event.type == SDL_MOUSEWHEEL) {
-				camera_delta_z -= sdl_event.wheel.y*sensitivity_z;
-				bool camera_z_has_moved = false;
-				float camera_z = camera[2];
-				camera_crop_tmp = camera_crop;
-				camera_move(struct vector3<float>(0.0f, 0.0f, camera_delta_z));
-				camera_get_crop(camera_crop);
-				if (camera_z != camera[2]) {
-					camera_move(struct vector3<float>(camera_crop_tmp[0] - camera_crop[0] + mouse_position[0] * (camera_z - camera[2]), 0.0f, 0.0f));
+				float camera_delta_z = 0.0f;
+				if (sdl_event.type == SDL_MOUSEWHEEL) {
+					camera_delta_z -= sdl_event.wheel.y * sensitivity_z;
+					bool camera_z_has_moved = false;
+					float camera_z = camera[2];
+					camera_crop_tmp = camera_crop;
+					camera_move(struct vector3<float>(0.0f, 0.0f, camera_delta_z));
 					camera_get_crop(camera_crop);
-					camera_move(struct vector3<float>(0.0f, camera_crop_tmp[2] - camera_crop[2] + mouse_position[1] * (camera_z - camera[2]), 0.0f));
+					if (camera_z != camera[2]) {
+						camera_move(struct vector3<float>(camera_crop_tmp[0] - camera_crop[0] + mouse_position[0] * (camera_z - camera[2]), 0.0f, 0.0f));
+						camera_get_crop(camera_crop);
+						camera_move(struct vector3<float>(0.0f, camera_crop_tmp[2] - camera_crop[2] + mouse_position[1] * (camera_z - camera[2]), 0.0f));
+						camera_get_crop(camera_crop);
+					}
+				}
+
+				if (sdl_event.type == SDL_MOUSEMOTION && sdl_event.button.button == SDL_BUTTON(SDL_BUTTON_RIGHT)) {
+					float zoom_sensitivity = sensitivity_xy * camera[2] * sensitivity_zoom_ratio;
+					if (zoom_sensitivity < 0.2f) zoom_sensitivity = 0.2f;
+					camera_move(struct vector3<float>(-sdl_event.motion.xrel * zoom_sensitivity, -sdl_event.motion.yrel * zoom_sensitivity, 0.0f));
 					camera_get_crop(camera_crop);
 				}
 			}
+
 			if (sdl_event.type == SDL_MOUSEMOTION) {
 				mouse_position[0] = sdl_event.motion.x;
 				mouse_position[1] = sdl_event.motion.y;
 			}
 
-			if (sdl_event.type == SDL_MOUSEMOTION && sdl_event.button.button == SDL_BUTTON(SDL_BUTTON_RIGHT)) {
-				float zoom_sensitivity = sensitivity_xy * camera[2] * sensitivity_zoom_ratio;
-				if (zoom_sensitivity < 0.2f) zoom_sensitivity = 0.2f;
-				camera_move(struct vector3<float>(-sdl_event.motion.xrel*zoom_sensitivity, -sdl_event.motion.yrel*zoom_sensitivity, 0.0f));
-				camera_get_crop(camera_crop);
+			if (ui_active != "") {
+				if (sdl_event.type == SDL_MOUSEBUTTONUP && sdl_event.button.button == SDL_BUTTON(SDL_BUTTON_LEFT)) {
+					//printf("clicking %i %i\n", mouse_position[0], mouse_position[1]);
+					ui_process_click(mouse_position[0], mouse_position[1]);
+				}
 			}
 		}
 
-		struct entity* es = (struct entity*) &bf_rw.data[entities_position];
-		for (int e = 0; e < entities.size(); e++) {
-			struct entity* en = &es[e];
-			if (en->et == ET_ITEM) {
-				en->orientation += 1;
+		if (game_started) {
+			struct entity* es = (struct entity*) & bf_rw.data[entities_position];
+			for (int e = 0; e < entities.size(); e++) {
+				struct entity* en = &es[e];
+				if (en->et == ET_ITEM) {
+					en->orientation += 1;
+				}
 			}
+			bit_field_invalidate_bulk(&bf_rw, entities_position, entities_size_in_bf);
+			bit_field_update_device(&bf_rw, 0);
+
+			launch_draw_map(bf_assets.device_data[0], gm.map_zoom_level_count, gm.map_zoom_center_z, gm.map_zoom_level_offsets_position, gm.map_positions, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
+
+			launch_draw_entities_kernel(bf_assets.device_data[0], player_models_position, item_models_position, map_models_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
+				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], tick_counter);
+
+			launch_draw_storm_kernel(bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[2], camera[2], storm_current, storm_to, 50, { 45, 0, 100 });
+
+			storm_next(&bf_assets, &bf_rw);
 		}
-		bit_field_invalidate_bulk(&bf_rw, entities_position, entities_size_in_bf);
-		bit_field_update_device(&bf_rw, 0);
 
-		launch_draw_map(bf_assets.device_data[0], gm.map_zoom_level_count, gm.map_zoom_center_z, gm.map_zoom_level_offsets_position, gm.map_positions, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
-
-		launch_draw_entities_kernel(bf_assets.device_data[0], player_models_position, item_models_position, map_models_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
-			bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], tick_counter);
-
-		launch_draw_storm_kernel(bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[2], camera[2], storm_current, storm_to, 50, { 45, 0, 100 });
+		if (ui_active != "") {
+			struct ui u = uis[ui_active];
+			if (!game_started) {
+				unsigned char* output_frame = (unsigned char *)&bf_output.data[output_position];
+				memset(output_frame, 0, output_size);
+				bit_field_invalidate_bulk(&bf_output, output_position, output_size_in_bf);
+				bit_field_update_device(&bf_output, 0);
+			}
+			launch_draw_ui_kernel(bf_assets.device_data[0], u.background_position, bf_output.device_data[0], output_position, resolution[0], resolution[1], 4);
+		}
 
 		bit_field_update_host(&bf_output, 0);
 
@@ -252,17 +289,25 @@ int main(int argc, char** argv) {
 		long tf_3 = clock();
 		long tf_ = tf_3 - tf;
 		sec += ((double)tf_ / CLOCKS_PER_SEC);
+		tf = clock();
 		fps++;
 
 		if (sec >= 1.0) {
 			printf("main fps: %d\r\n", fps);
 			printf("main ft: %f, main ft_l: %f\r\n", tf_ / (double)CLOCKS_PER_SEC, (tf_3 - tf_l) / (double)CLOCKS_PER_SEC);
+			if (fps > target_ticks_per_second+2) {
+				frame_balancing++;
+			} else if (fps < target_ticks_per_second && frame_balancing > 0) {
+				frame_balancing--;
+			}
 			sec = 0;
 			fps = 0;
 		}
+		if (frame_balancing > 0) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(frame_balancing));
+		}
 
 		tick_counter++;
-		storm_next(&bf_assets, &bf_rw);
 	}
 	return 0;
 }
