@@ -8,10 +8,8 @@
 #include "Grid.hpp"
 #include "Camera.hpp"
 #include "SDLShow.hpp"
-#include "Resize.hpp"
-#include "Copy.hpp"
-#include "DrawPlayers.hpp"
 #include "Storm.hpp"
+#include "Entity.hpp"
 
 #include "time.h"
 #include "math.h"
@@ -38,6 +36,8 @@ int main(int argc, char** argv) {
 	unsigned int output_size = resolution[0] * resolution[1] * 4;
 	unsigned int output_size_in_bf = (int)ceilf(output_size / (float) sizeof(unsigned int));
 	unsigned int output_position;
+
+	srand(time(nullptr));
 
 	/////////////////
 	// -- ASSETS --//
@@ -78,6 +78,78 @@ int main(int argc, char** argv) {
 	grid_init(&bf_rw, &gd, struct vector3<float>((float)gm.map_dimensions[0], (float)gm.map_dimensions[1], 1.0f), struct vector3<float>(32.0f, 32.0f, 1.0f), struct vector3<float>(0, 0, 0));
 
 	map_add_static_assets(&bf_assets, &bf_rw, &gd);
+	
+	//spawn players
+	for (int i = 0; i < 512; i++) {
+		stringstream ss_p;
+		ss_p << i;
+
+		entity_add("mur1_" + ss_p.str(), ET_PLAYER, 0, 0);
+		struct entity* cur_e = &entities[entities.size() - 1];
+
+		bool found_spawn = false;
+		float x = 0;
+		float y = 0;
+		float z = 0;
+		while (!found_spawn) {
+			x = 10.0f + rand() % (gm.map_dimensions[0] - 32);
+			y = 10.0f + rand() % (gm.map_dimensions[1] - 32);
+			z = 0.0f;
+			unsigned int grid_index = grid_get_index(bf_rw.data, gd.position_in_bf, { x, y, z });
+			if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
+				unsigned char* pathables = (unsigned char*)&bf_assets.data[gm.map_pathable_position];
+				unsigned char pathable = pathables[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
+				if (pathable > 0) {
+					unsigned char* spawn_probabilities = (unsigned char*)&bf_assets.data[gm.map_spawn_probabilities_position];
+					unsigned char spawn_probability = spawn_probabilities[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
+					if (rand() / (float)RAND_MAX * 255 <= spawn_probability) {
+						found_spawn = true;
+					}
+				}
+			}
+		}
+		cur_e->position = { x, y, z };
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), entities.size() - 1);
+
+		player_add("mur1_" + ss_p.str(), PT_HOPE, entities.size()-1);
+	}
+
+	players_upload(&bf_rw);
+
+	//spawn weapons
+	for (int i = 0; i < players.size(); i++) {
+		stringstream ss_p;
+		ss_p << i;
+		entity_add("colt_" + ss_p.str(), ET_ITEM, 50, 0);
+		struct entity* cur_e = &entities[entities.size() - 1];
+		bool found_spawn = false;
+		float x = 0;
+		float y = 0;
+		float z = 0;
+		while (!found_spawn) {
+			x = 10.0f + rand() % (gm.map_dimensions[0] - 32);
+			y = 10.0f + rand() % (gm.map_dimensions[1] - 32);
+			z = 0.0f;
+			unsigned int grid_index = grid_get_index(bf_rw.data, gd.position_in_bf, { x, y, z });
+			if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
+				unsigned char* pathables = (unsigned char*)&bf_assets.data[gm.map_pathable_position];
+				unsigned char pathable = pathables[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
+				if (pathable > 0) {
+					unsigned char* loot_spawn_probabilities = (unsigned char*)&bf_assets.data[gm.map_loot_probabilities_position];
+					unsigned char loot_spawn_probability = loot_spawn_probabilities[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
+					if (rand() / (float)RAND_MAX * 255 <= loot_spawn_probability) {
+						found_spawn = true;
+					}
+				}
+			}
+		}
+		cur_e->position = { x, y, z };
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { item_models[0].model_scale, item_models[0].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[0]), entities.size()-1);
+	}
+
+	entities_upload(&bf_rw);
+
+	bit_field_update_device(&bf_rw, 0);
 
 	///////////////////////////
 	// -- OUTPUT BITFIELD -- //
@@ -87,36 +159,6 @@ int main(int argc, char** argv) {
 	bit_field_init(&bf_output, 16, 1024);
 	output_position = bit_field_add_bulk_zero(&bf_output, output_size_in_bf)+1;
 	bit_field_register_device(&bf_output, 0);
-
-	srand(time(nullptr));
-	/*
-	for (int i = 0; i < 512; i++) {
-		stringstream ss_p;
-		ss_p << i;
-		player_add("mur1_" + ss_p.str(), PT_HOPE, 0);
-		players["mur1_" + ss_p.str()].position = { 10.0f + rand() % (map_dimensions[0] - 32), 10.0f + rand() % (map_dimensions[1] - 32), 0.0f };
-		
-		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, players["mur1_" + ss_p.str()].position, { m_hope.model_scale, m_hope.model_scale, 1.0f }, {0.0f, 0.0f, 0.0f}, model_get_max_position(&m_hope), i);
-		entities.emplace_back(players["mur1_" + ss_p.str()]);
-	}
-	*/
-	/*
-	int item_start = entities.size();
-	for (int i = 0; i < 20; i++) {
-		stringstream ss_p;
-		ss_p << i;
-		player_add("colt_" + ss_p.str(), PT_HOPE, 2);
-		players["colt_" + ss_p.str()].position = { 450.0f + (i % 10) * 100, 450.0f + (i / 10) * 100, 0.0f };
-		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, players["colt_" + ss_p.str()].position, { m_colt.model_scale, m_colt.model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&m_colt), item_start + i);
-		entities.emplace_back(players["colt_" + ss_p.str()]);
-	}
-
-	unsigned int players_size_in_bf = entities.size() * (int)ceilf(sizeof(struct player) / (float)sizeof(unsigned int));
-	unsigned int players_position = bit_field_add_bulk_zero(&bf_rw, players_size_in_bf)+1;
-	struct player* players_ptr = (struct player *) &bf_rw.data[players_position];
-	memcpy(players_ptr, entities.data(), entities.size() * sizeof(struct player));
-	*/
-	bit_field_update_device(&bf_rw, 0);
 
 	camera = { 0.0f, 0.0f, 1.0f };
 
@@ -185,40 +227,22 @@ int main(int argc, char** argv) {
 				camera_get_crop(camera_crop);
 			}
 		}
-		/*
-		for (int p = 0; p < 512; p++) {
-			grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, players_ptr[p].position, { m_hope.model_scale, m_hope.model_scale, 1.0f }, {0.0f, 0.0f, 0.0f}, model_get_max_position(&m_hope), p);
+
+		struct entity* es = (struct entity*) &bf_rw.data[entities_position];
+		for (int e = 0; e < entities.size(); e++) {
+			struct entity* en = &es[e];
+			if (en->et == ET_ITEM) {
+				en->orientation += 1;
+			}
 		}
-		for (int p = 0; p < 512; p++) {
-				float rand_dir = (rand() / (float)RAND_MAX - 0.5f) * 2;
-				if (players_ptr[p].position[0] + rand_dir < map_dimensions[0] - 32 && players_ptr[p].position[0] + rand_dir >= 10) {
-					players_ptr[p].position[0] += rand_dir;
-				}
-				if (players_ptr[p].position[1] + rand_dir < map_dimensions[1] - 32 && players_ptr[p].position[1] + rand_dir >= 10) {
-					players_ptr[p].position[1] += rand_dir;
-				}
-				
-				players_ptr[p].orientation += (rand_dir - 0.5);
-				if (players_ptr[p].orientation < 0) players_ptr[p].orientation += 360;
-				//players_ptr[0].position[0] += 0.05f;
-				grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, players_ptr[p].position, { m_hope.model_scale, m_hope.model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&m_hope), p);
-				players_ptr = (struct player*) &bf_rw.data[players_position];
-		}
-		for (int p = item_start; p < 512 + 20 + 20; p++) {
-			players_ptr[p].orientation += 1;
-		}
-		
-		bit_field_invalidate_bulk(&bf_rw, players_position, players_size_in_bf);
+		bit_field_invalidate_bulk(&bf_rw, entities_position, entities_size_in_bf);
 		bit_field_update_device(&bf_rw, 0);
-		*/
+
 		launch_draw_map(bf_assets.device_data[0], gm.map_zoom_level_count, gm.map_zoom_center_z, gm.map_zoom_level_offsets_position, gm.map_positions, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
-		//launch_resize(bf_assets.device_data[0], assets["map_0.png"], map_dimensions[0], map_dimensions[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
-		/*
-		launch_draw_players_kernel(bf_assets.device_data[0], models_position,
-			bf_rw.device_data[0], players_position, gd.position_in_bf, gd.data_position_in_bf,
-			bf_output.device_data[0], output_position, resolution[0], resolution[1], 4,
-			camera_crop[0], camera_crop[2], camera[2], tick_counter);
-			*/
+
+		launch_draw_entities_kernel(bf_assets.device_data[0], player_models_position, item_models_position, map_models_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
+			bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], tick_counter);
+
 		launch_draw_storm_kernel(bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[2], camera[2], storm_current, storm_to, 50, { 45, 0, 100 });
 
 		bit_field_update_host(&bf_output, 0);

@@ -7,11 +7,13 @@
 #include "Util.hpp"
 #include "Model.hpp"
 #include "AssetLoader.hpp"
+#include "Entity.hpp"
 
 unsigned int                    player_models_position;
 map<player_type, struct model>  player_models;
 
-map<string, struct player> players;
+unsigned int                    players_position;
+map<string, struct player>      players;
 
 void player_models_init(struct bit_field* bf_assets) {
     vector<string> model_cfgs = get_all_files_names_within_folder("./players", "*", "cfg");
@@ -39,10 +41,10 @@ void player_models_init(struct bit_field* bf_assets) {
     }
     unsigned int size = pms_sorted.size() * sizeof(struct model);
     unsigned int size_in_bf = (unsigned int)ceilf(size/(float)sizeof(unsigned int));
-    player_models_position = bit_field_add_bulk(bf_assets, (unsigned int*)pms_sorted.data(), size, size_in_bf)+1;
+    player_models_position = bit_field_add_bulk(bf_assets, (unsigned int*)pms_sorted.data(), size_in_bf, size)+1;
 }
 
-void player_add(string name, enum player_type pt, unsigned int model_id) {
+void player_add(string name, enum player_type pt, unsigned int entity_id) {
     map<string, struct player>::iterator it = players.find(name);
     if (it != players.end()) {
     } else {
@@ -59,8 +61,7 @@ void player_add(string name, enum player_type pt, unsigned int model_id) {
         }
         p.player_stance = PS_WALKING;
         p.player_action = PA_NONE;
-        p.orientation = (float)(rand() % 360);
-        p.model_id = model_id;
+        p.entity_id = entity_id;
         players.try_emplace(name, p);
     }
 }
@@ -70,4 +71,16 @@ void player_type_change(string name, enum player_type pt) {
     if (it != players.end()) {
         it->second.pt = pt;
     }
+}
+
+void players_upload(struct bit_field *bf) {
+    vector<struct player> pl_v;
+    map<string, struct player>::iterator it = players.begin();
+    if (it != players.end()) {
+        pl_v.push_back(it->second);
+        it++;
+    }
+    unsigned int size = pl_v.size() * sizeof(struct player);
+    unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
+    players_position = bit_field_add_bulk(bf, (unsigned int*)pl_v.data(), size_in_bf, size) + 1;
 }

@@ -233,8 +233,8 @@ void map_list_init() {
 }
 
 void map_load(struct bit_field *bf_assets, string name) {
-    map<string, string> map_cfg = get_cfg_key_value_pairs("./maps", name + ".cfg");
-    map<string, string>::iterator it = map_cfg.begin();
+    vector<pair<string, string>> map_cfg = get_cfg_key_value_pairs("./maps", name + ".cfg");
+    vector<pair<string, string>>::iterator it = map_cfg.begin();
     gm.bf_map = bf_assets;
     while (it != map_cfg.end()) {
         if (it->first == "dimensions") {
@@ -283,17 +283,17 @@ void map_load(struct bit_field *bf_assets, string name) {
             for (int x = 0; x < tiledim_x; x++) {
                 stringstream sx;
                 sx << x;
-                map_positions.emplace_back(assets[name + "_" + ss.str() + "_" + sy.str() + "_" + sx.str() + ".png"]);
-                printf("map_init_positions: %i\n", assets[name + "_" + ss.str() + "_" + sy.str() + "_" + sx.str() + ".png"]);
+                map_positions.emplace_back(assets["./maps/" + name + "/" + name + "_" + ss.str() + "_" + sy.str() + "_" + sx.str() + ".png"]);
+                printf("map_init_positions: %i\n", assets["./maps/" + name + "/" + name + "_" + ss.str() + "_" + sy.str() + "_" + sx.str() + ".png"]);
             }
         }
     }
     gm.map_zoom_level_offsets_position = bit_field_add_bulk(bf_assets, map_zoom_level_offsets.data(), map_zoom_level_offsets.size(), map_zoom_level_offsets.size() * sizeof(unsigned int)) + 1;
     gm.map_positions = bit_field_add_bulk(bf_assets, map_positions.data(), map_positions.size(), map_positions.size() * sizeof(unsigned int)) + 1;
-    gm.map_static_assets_position = assets[name + "_static_assets.png"];
-    gm.map_loot_probabilities_position = assets[name + ".loot_probabilities.png"];
-    gm.map_spawn_probabilities_position = assets[name + ".spawn_probabilities.png"];
-    gm.map_pathable_position = assets[name + ".pathable.png"];
+    gm.map_static_assets_position = assets["./maps/" + name + "/" + name + "_static_assets.png"];
+    gm.map_loot_probabilities_position = assets["./maps/" + name + "/" + name + ".loot_probabilities.png"];
+    gm.map_spawn_probabilities_position = assets["./maps/" + name + "/" + name + ".spawn_probabilities.png"];
+    gm.map_pathable_position = assets["./maps/" + name + "/" + name + ".pathable.png"];
 
     //load map assets
     vector<string> model_cfgs = get_all_files_names_within_folder("./maps/" + name + "/assets/", "*", "cfg");
@@ -318,7 +318,7 @@ void map_load(struct bit_field *bf_assets, string name) {
     }
     unsigned int size = map_models.size() * sizeof(struct model);
     unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
-    map_models_position = bit_field_add_bulk(bf_assets, (unsigned int*)map_models.data(), size, size_in_bf) + 1;
+    map_models_position = bit_field_add_bulk(bf_assets, (unsigned int*)map_models.data(), size_in_bf, size) + 1;
 }
 
 void map_add_static_assets(struct bit_field* bf_assets, struct bit_field* bf_grid, struct grid* gd) {
@@ -335,11 +335,12 @@ void map_add_static_assets(struct bit_field* bf_assets, struct bit_field* bf_gri
                 printf("r %i g %i b %i ", (int)pixel_r, (int)pixel_g, (int) pixel_b);
                 int orientation = pixel_r * 16 + (pixel_g / 16);
                 printf("adding asset: %i at x %i y %i, z %i, pixel_orientation %i\n", pixel_b, x, y, pixel_alpha, orientation);
-                entity_add("static_asset", ET_STATIC_ASSET, pixel_b-100, pixel_alpha);
-                struct entity cur_e = entities[entities.size() - 1];
-                cur_e.position = { (float)x, (float)y, 0.0f };
-                cur_e.orientation = orientation;
-                grid_object_add(bf_grid, bf_grid->data, gd->position_in_bf, cur_e.position, { map_models[pixel_b-100].model_scale, map_models[pixel_b-100].model_scale, 1.0f}, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models[pixel_b-100]), entities.size()-1);
+                entity_add("static_asset", ET_STATIC_ASSET, pixel_b, pixel_alpha);
+                struct entity *cur_e = &entities[entities.size() - 1];
+                cur_e->position = { (float)x, (float)y, 0.0f };
+                cur_e->orientation = orientation;
+                printf("model_scale entity adding %f, shadow dim %i %i\n", map_models[pixel_b-100].model_scale, map_models[pixel_b - 100].shadow_dimensions[0], map_models[pixel_b - 100].shadow_dimensions[1]);
+                grid_object_add(bf_grid, bf_grid->data, gd->position_in_bf, cur_e->position, { map_models[pixel_b-100].model_scale, map_models[pixel_b-100].model_scale, 1.0f}, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models[pixel_b-100]), entities.size()-1);
             }
         }
     }

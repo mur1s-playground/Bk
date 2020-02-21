@@ -24,7 +24,7 @@ void asset_loader_load_folder(struct bit_field* asset_store, string folder) {
 		int size = width * height * 4;
 		int size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
 		int position = bit_field_add_bulk(asset_store, (unsigned int*)image.data(), size_in_bf, size);
-		assets.try_emplace(png_files[i], position + 1);
+		assets.try_emplace(folder + png_files[i], position + 1);
 	}
 }
 /*
@@ -61,6 +61,6 @@ void asset_loader_load_map(struct bit_field* asset_store, string folder, string 
 		printf("name %s, width %i, height %i, channels: %i\n", png_files[i].c_str(), width, height, channels);
 		int size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
 		int position = bit_field_add_bulk(asset_store, (unsigned int*)image.data(), size_in_bf, size);
-		assets.try_emplace(png_files[i], position + 1);
+		assets.try_emplace("./maps/" + folder + "/" + png_files[i], position + 1);
 	}
 }

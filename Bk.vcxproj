@@ -96,8 +96,6 @@
     <ClInclude Include="AssetLoader.hpp" />
     <ClInclude Include="BitField.hpp" />
     <ClInclude Include="Camera.hpp" />
-    <ClInclude Include="Copy.hpp" />
-    <ClInclude Include="DrawPlayers.hpp" />
     <ClInclude Include="Entity.hpp" />
     <ClInclude Include="Grid.hpp" />
     <ClInclude Include="Item.hpp" />
@@ -106,7 +104,6 @@
     <ClInclude Include="Map.hpp" />
     <ClInclude Include="Model.hpp" />
     <ClInclude Include="Player.hpp" />
-    <ClInclude Include="Resize.hpp" />
     <ClInclude Include="SDLShow.hpp" />
     <ClInclude Include="Storm.hpp" />
     <ClInclude Include="Util.hpp" />
@@ -114,11 +111,8 @@
     <ClInclude Include="Vector3.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="Copy.cu" />
-    <CudaCompile Include="DrawPlayers.cu" />
     <CudaCompile Include="Entity.cu" />
     <CudaCompile Include="Map.cu" />
-    <CudaCompile Include="Resize.cu" />
     <CudaCompile Include="Storm.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

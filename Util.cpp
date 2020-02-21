@@ -35,9 +35,9 @@ vector<string> get_all_files_names_within_folder(string folder, string wildcard,
     return names;
 }
 
-map<string, string> get_cfg_key_value_pairs(string folder, string filename) {
+vector<pair<string, string>> get_cfg_key_value_pairs(string folder, string filename) {
     string filepath = folder + "/" + filename;
-    map<string, string> result;
+    vector<pair<string, string>> result;
         
     ifstream file(filepath);
     string filecontent;
@@ -51,7 +51,7 @@ map<string, string> get_cfg_key_value_pairs(string folder, string filename) {
                     name = trim(name);
                     string value = filecontent.substr(pos + 1);
                     value = trim(value);
-                    result.try_emplace(name, value);
+                    result.push_back(pair<string, string>(name, value));
                     printf("cfg key: %s, value: %s\n", name.c_str(), value.c_str());
                 }
             }

@@ -29,5 +29,5 @@ void item_models_init(struct bit_field* bf_assets) {
     }
     unsigned int size = sorted_models.size() * sizeof(struct model);
     unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
-    item_models_position = bit_field_add_bulk(bf_assets, (unsigned int*)sorted_models.data(), size, size_in_bf) + 1;
+    item_models_position = bit_field_add_bulk(bf_assets, (unsigned int*)sorted_models.data(), size_in_bf, size) + 1;
 }
