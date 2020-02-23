@@ -340,7 +340,8 @@ void map_add_static_assets(struct bit_field* bf_assets, struct bit_field* bf_gri
                 cur_e->position = { (float)x, (float)y, 0.0f };
                 cur_e->orientation = orientation;
                 printf("model_scale entity adding %f, shadow dim %i %i\n", map_models[pixel_b-100].model_scale, map_models[pixel_b - 100].shadow_dimensions[0], map_models[pixel_b - 100].shadow_dimensions[1]);
-                grid_object_add(bf_grid, bf_grid->data, gd->position_in_bf, cur_e->position, { map_models[pixel_b-100].model_scale, map_models[pixel_b-100].model_scale, 1.0f}, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models[pixel_b-100]), entities.size()-1);
+                struct vector3<float> max_pos = model_get_max_position(&map_models[pixel_b - 100])* map_models[pixel_b - 100].model_scale;
+                grid_object_add(bf_grid, bf_grid->data, gd->position_in_bf, cur_e->position, { 1.0f, 1.0f, 1.0f}, { 0.0f, 0.0f, 0.0f }, max_pos, entities.size()-1);
             }
         }
     }

@@ -46,6 +46,7 @@ extern unsigned int						player_models_position;
 extern map<player_type, struct model>	player_models;
 
 extern map<string, struct player>		players;
+extern unsigned int						players_position;
 
 void player_models_init(struct bit_field* bf_assets);
 void player_add(string name, enum player_type pt, unsigned int entity_id);

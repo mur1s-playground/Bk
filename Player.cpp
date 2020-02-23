@@ -53,6 +53,7 @@ void player_add(string name, enum player_type pt, unsigned int entity_id) {
         for (int i = 0; i < name.length() && i < 50; i++) {
             p.name[i] = name[i];
             p.name_len = i;
+
         }
         p.health = 100;
         for (int i = 0; i < 6; i++) {

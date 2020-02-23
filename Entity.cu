@@ -86,7 +86,7 @@ __device__ float getInterpixel(const unsigned char* frame, const unsigned int wi
 }
 
 __global__ void draw_entities_kernel(
-        const unsigned int* device_data_assets, const unsigned int players_models_position, const unsigned int item_models_position, const unsigned int map_models_position,
+        const unsigned int* device_data_assets, const unsigned int players_models_position, const unsigned int item_models_position, const unsigned int map_models_position, const unsigned int font_position,
         const unsigned int* device_data_rw, const unsigned int entities_position, const unsigned int gd_position_in_bf, const unsigned int gd_data_position_in_bf,
         unsigned int* device_data_output, const unsigned int output_position, const unsigned int output_width, const unsigned int output_height, const unsigned int output_channels,
         const unsigned int camera_x1, const unsigned int camera_y1, const float camera_z, const unsigned int tick_counter) {
@@ -146,7 +146,7 @@ __global__ void draw_entities_kernel(
                         output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255 * (e % 2);
                         output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
                         */
-                        struct model* m;
+                        struct model* m = nullptr;
                         if (entities[entity_id].et == ET_PLAYER) {
                             m = &player_models[entities[entity_id].model_id];
                         } else if (entities[entity_id].et == ET_ITEM) {
@@ -155,49 +155,51 @@ __global__ void draw_entities_kernel(
                             m = &map_models[entities[entity_id].model_id - 100];
                         }
                         
-                        const unsigned int *shadows_positions = &device_data_assets[m->shadow_positions];
-                        int upscale = 1;
-                        float upscale_fac = 1.0f;
-                        unsigned int shadow_position = shadows_positions[upscale-1];
-                        while (camera_z / (m->shadow_scale / upscale_fac) < 2 && upscale-1 < m->shadow_zoom_level_count-1) {
-                            upscale++;
-                            shadow_position = shadows_positions[upscale-1];
-                            upscale_fac *= 2.0f;
-                        }
+                        if (m != nullptr) {
+                            const unsigned int* shadows_positions = &device_data_assets[m->shadow_positions];
+                            int upscale = 1;
+                            float upscale_fac = 1.0f;
+                            unsigned int shadow_position = shadows_positions[upscale - 1];
+                            while (camera_z / (m->shadow_scale / upscale_fac) < 2 && upscale - 1 < m->shadow_zoom_level_count - 1) {
+                                upscale++;
+                                shadow_position = shadows_positions[upscale - 1];
+                                upscale_fac *= 2.0f;
+                            }
 
-                        sampling_filter_dim = ceilf(camera_z / (m->shadow_scale / upscale_fac));
+                            sampling_filter_dim = ceilf(camera_z / (m->shadow_scale / upscale_fac));
 
-                        float offset_to_model_shadow_base_x = (current_game_x - (entities[entity_id].position[0] + m->shadow_offset[0])) / (m->shadow_scale / upscale_fac);
-                        float offset_to_model_shadow_base_y = (current_game_y - (entities[entity_id].position[1] + m->shadow_offset[1])) / (m->shadow_scale / upscale_fac);
+                            float offset_to_model_shadow_base_x = (current_game_x - (entities[entity_id].position[0] + m->shadow_offset[0])) / (m->shadow_scale / upscale_fac);
+                            float offset_to_model_shadow_base_y = (current_game_y - (entities[entity_id].position[1] + m->shadow_offset[1])) / (m->shadow_scale / upscale_fac);
 
-                       if (offset_to_model_shadow_base_x >= 1 && offset_to_model_shadow_base_x < m->shadow_dimensions[0] * upscale_fac - 1 &&
-                            offset_to_model_shadow_base_y >= 1 && offset_to_model_shadow_base_y < m->shadow_dimensions[1] * upscale_fac - 1) {
-                               /*
-                               output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
-                               output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255 * (e + 1 % 2);
-                               output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255 * (e % 2);
-                               output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
-                               */
+                            if (offset_to_model_shadow_base_x >= 1 && offset_to_model_shadow_base_x < m->shadow_dimensions[0] * upscale_fac - 1 &&
+                                offset_to_model_shadow_base_y >= 1 && offset_to_model_shadow_base_y < m->shadow_dimensions[1] * upscale_fac - 1) {
+                                /*
+                                output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
+                                output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255 * (e + 1 % 2);
+                                output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255 * (e % 2);
+                                output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
+                                */
 
-                            unsigned int* p_shadow_positions = (unsigned int*)&device_data_assets[shadow_position];
-                            unsigned char* p_shadow = (unsigned char*)&device_data_assets[p_shadow_positions[(int)(entities[entity_id].orientation / 10) % 36]];
+                                unsigned int* p_shadow_positions = (unsigned int*)&device_data_assets[shadow_position];
+                                unsigned char* p_shadow = (unsigned char*)&device_data_assets[p_shadow_positions[(int)(entities[entity_id].orientation / 10) % 36]];
 
-                            //enum player_stance p_stance = players[p].player_stance;
-                            //enum player_action p_action = players[p].player_action;
+                                //enum player_stance p_stance = players[p].player_stance;
+                                //enum player_action p_action = players[p].player_action;
 
-                            for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
-                                for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
-                                    if (offset_to_model_shadow_base_x + s_x >= 1 && offset_to_model_shadow_base_x + s_x < m->shadow_dimensions[0] * upscale_fac - 1 &&
-                                        offset_to_model_shadow_base_y + s_y >= 1 && offset_to_model_shadow_base_y + s_y < m->shadow_dimensions[1] * upscale_fac - 1
-                                        ) {
+                                for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
+                                    for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
+                                        if (offset_to_model_shadow_base_x + s_x >= 1 && offset_to_model_shadow_base_x + s_x < m->shadow_dimensions[0] * upscale_fac - 1 &&
+                                            offset_to_model_shadow_base_y + s_y >= 1 && offset_to_model_shadow_base_y + s_y < m->shadow_dimensions[1] * upscale_fac - 1
+                                            ) {
 
-                                        float model_palette_idx_x = offset_to_model_shadow_base_x + s_x;
-                                        float model_palette_idx_y = offset_to_model_shadow_base_y + s_y;
+                                            float model_palette_idx_x = offset_to_model_shadow_base_x + s_x;
+                                            float model_palette_idx_y = offset_to_model_shadow_base_y + s_y;
 
-                                        float interpixel_alpha = getInterpixel(p_shadow, m->shadow_dimensions[0] * upscale_fac, m->shadow_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, 3);
-                                        if (interpixel_alpha > 25) {
-                                            float interpixel = getInterpixel(p_shadow, m->shadow_dimensions[0] * upscale_fac, m->shadow_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, current_channel);
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - interpixel_alpha) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (interpixel_alpha / 255.0f) * interpixel));
+                                            float interpixel_alpha = getInterpixel(p_shadow, m->shadow_dimensions[0] * upscale_fac, m->shadow_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, 3);
+                                            if (interpixel_alpha > 25) {
+                                                float interpixel = getInterpixel(p_shadow, m->shadow_dimensions[0] * upscale_fac, m->shadow_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, current_channel);
+                                                output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - interpixel_alpha) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (interpixel_alpha / 255.0f) * interpixel));
+                                            }
                                         }
                                     }
                                 }
@@ -207,70 +209,92 @@ __global__ void draw_entities_kernel(
                 }
                 float player_y_max = -1.0f;
                 int player_id_max = -1;
+                bool has_text = false;
                 for (int e = 0; e < entities_count; e++) {
                     unsigned int entity_id = device_data_rw[entities_iddata_position + 1 + e];
                     if (entity_id < UINT_MAX) {
-                        struct model* m;
+                        struct model* m = nullptr;
                         if (entities[entity_id].et == ET_PLAYER) {
                             m = &player_models[entities[entity_id].model_id];
-                        }
-                        else if (entities[entity_id].et == ET_ITEM) {
+                        } else if (entities[entity_id].et == ET_ITEM) {
                             m = &item_models[entities[entity_id].model_id - 50];
-                        }
-                        else if (entities[entity_id].et == ET_STATIC_ASSET) {
+                        } else if (entities[entity_id].et == ET_STATIC_ASSET) {
                             m = &map_models[entities[entity_id].model_id - 100];
                         }
 
-                        const unsigned int* model_positions = &device_data_assets[m->model_positions];
-                        int upscale = 1;
-                        float upscale_fac = 1.0f;
-                        unsigned int model_position = model_positions[upscale-1];
-                        while (camera_z / (m->model_scale / upscale_fac) < 2 && upscale-1 < m->model_zoom_level_count - 1) {
-                            upscale++;
-                            model_position = model_positions[upscale-1];
-                            upscale_fac *= 2.0f;
-                        }
+                        if (m != nullptr) {
+                            const unsigned int* model_positions = &device_data_assets[m->model_positions];
+                            int upscale = 1;
+                            float upscale_fac = 1.0f;
+                            unsigned int model_position = model_positions[upscale - 1];
+                            while (camera_z / (m->model_scale / upscale_fac) < 2 && upscale - 1 < m->model_zoom_level_count - 1) {
+                                upscale++;
+                                model_position = model_positions[upscale - 1];
+                                upscale_fac *= 2.0f;
+                            }
 
-                        sampling_filter_dim = ceilf(camera_z / (m->model_scale / upscale_fac));
+                            sampling_filter_dim = ceilf(camera_z / (m->model_scale / upscale_fac));
 
-                        float offset_to_model_base_x = (current_game_x - (entities[entity_id].position[0])) / (m->model_scale / upscale_fac);
-                        float offset_to_model_base_y = (current_game_y - (entities[entity_id].position[1])) / (m->model_scale / upscale_fac);
+                            float offset_to_model_base_x = (current_game_x - (entities[entity_id].position[0])) / (m->model_scale / upscale_fac);
+                            float offset_to_model_base_y = (current_game_y - (entities[entity_id].position[1])) / (m->model_scale / upscale_fac);
 
-                        if (offset_to_model_base_x >= 1 && offset_to_model_base_x < m->model_dimensions[0] * upscale_fac - 1 &&
-                            offset_to_model_base_y >= 1 && offset_to_model_base_y < m->model_dimensions[1] * upscale_fac - 1) {
-
-                            /*
-                              output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
-                              output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255 * (e + 1 % 2);
-                              output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255 * (e % 2);
-                              output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
-                              */
-
-                            unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_position];
-                            unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[(int)(entities[entity_id].orientation / 10) % 36]];
-
-                            if (m->mt == MT_LOOTABLE_ITEM) {
-                                if (offset_to_model_base_x <= 22 * camera_z || offset_to_model_base_y <= 22 * camera_z || offset_to_model_base_x >= m->model_dimensions[0] * upscale_fac - (22 * camera_z) || offset_to_model_base_y >= m->model_dimensions[1] * upscale_fac - (22 * camera_z)) {
-                                    float alpha_item = 150;
-                                    output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = (unsigned char)(((255 - alpha_item) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (alpha_item / 255.0f) * 255));
+                            if (entities[entity_id].et == ET_PLAYER) {
+                                if (offset_to_model_base_y < 3 && offset_to_model_base_y >= -35.0f && offset_to_model_base_x + 32.0f >= -3 && offset_to_model_base_x + 32.0f < entities[entity_id].name_len * 32 + 3) {
+                                    int bg_alpha = 150;
+                                    output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - bg_alpha) / 255.0f * 255 + (bg_alpha / 255.0f) * 150));
+                                }
+                                if (offset_to_model_base_y < 0 && offset_to_model_base_y >= -32.0f && offset_to_model_base_x + 32.0f >= 0 && offset_to_model_base_x + 32.0f < entities[entity_id].name_len *32) {
+                                    int letter_idx = (int)(offset_to_model_base_x + 32.0f) / 32;
+                                    int letter_code = (int)entities[entity_id].name[letter_idx] - 48;
+                                    if (letter_code >= 0 && letter_code < 122 - 48) {
+                                        unsigned char* letter = (unsigned char*)&device_data_assets[device_data_assets[font_position + (int)entities[entity_id].name[letter_idx] - 48]];
+                                        int letter_y = (int)offset_to_model_base_y + 32;
+                                        int letter_x = ((int)offset_to_model_base_x + 32) % 32;
+                                        float letter_alpha = letter[letter_y * (32 * 4) + letter_x * 4 + 3];
+                                        if (letter_alpha > 25) {
+                                            //printf("%i ", (int)entities[entity_id].name[letter_idx]);                                        
+                                            output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - letter_alpha) / 255.0f * 255 + (letter_alpha / 255.0f) * letter[letter_y * (32 * 4) + letter_x * 4 + current_channel]));
+                                        }
+                                    }
                                 }
                             }
 
-                            for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
-                                for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
-                                    if (offset_to_model_base_x + s_x >= 1 && offset_to_model_base_x + s_x < m->model_dimensions[0] * upscale_fac - 1 &&
-                                        offset_to_model_base_y + s_y >= 1 && offset_to_model_base_y + s_y < m->model_dimensions[1] * upscale_fac - 1
-                                        ) {
-                                        float model_palette_idx_x = offset_to_model_base_x + s_x;
-                                        float model_palette_idx_y = offset_to_model_base_y + s_y;
+                            if (offset_to_model_base_x >= 1 && offset_to_model_base_x < m->model_dimensions[0] * upscale_fac - 1 &&
+                                offset_to_model_base_y >= 1 && offset_to_model_base_y < m->model_dimensions[1] * upscale_fac - 1) {
 
-                                        float interpixel_alpha = getInterpixel(p_model, m->model_dimensions[0] * upscale_fac, m->model_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, 3);
-                                        if (interpixel_alpha >= 64) {
-                                            if (entities[entity_id].position[1]+(m->model_dimensions[1]*m->model_scale) > player_y_max) {
-                                                player_y_max = entities[entity_id].position[1]+ (m->model_dimensions[1] * m->model_scale);
-                                                player_id_max = entity_id;
-                                                s_y = sampling_filter_dim;
-                                                s_x = sampling_filter_dim;
+                                /*
+                                  output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
+                                  output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255 * (e + 1 % 2);
+                                  output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255 * (e % 2);
+                                  output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
+                                  */
+
+                                unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_position];
+                                unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[(int)(entities[entity_id].orientation / 10) % 36]];
+
+                                if (m->mt == MT_LOOTABLE_ITEM) {
+                                    if (offset_to_model_base_x <= 22 * camera_z || offset_to_model_base_y <= 22 * camera_z || offset_to_model_base_x >= m->model_dimensions[0] * upscale_fac - (22 * camera_z) || offset_to_model_base_y >= m->model_dimensions[1] * upscale_fac - (22 * camera_z)) {
+                                        float alpha_item = 150;
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = (unsigned char)(((255 - alpha_item) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (alpha_item / 255.0f) * 255));
+                                    }
+                                }
+
+                                for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
+                                    for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
+                                        if (offset_to_model_base_x + s_x >= 1 && offset_to_model_base_x + s_x < m->model_dimensions[0] * upscale_fac - 1 &&
+                                            offset_to_model_base_y + s_y >= 1 && offset_to_model_base_y + s_y < m->model_dimensions[1] * upscale_fac - 1
+                                            ) {
+                                            float model_palette_idx_x = offset_to_model_base_x + s_x;
+                                            float model_palette_idx_y = offset_to_model_base_y + s_y;
+
+                                            float interpixel_alpha = getInterpixel(p_model, m->model_dimensions[0] * upscale_fac, m->model_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, 3);
+                                            if (interpixel_alpha >= 64) {
+                                                if (entities[entity_id].position[1] + (m->model_dimensions[1] * m->model_scale) > player_y_max) {
+                                                    player_y_max = entities[entity_id].position[1] + (m->model_dimensions[1] * m->model_scale);
+                                                    player_id_max = entity_id;
+                                                    s_y = sampling_filter_dim;
+                                                    s_x = sampling_filter_dim;
+                                                }
                                             }
                                         }
                                     }
@@ -282,10 +306,10 @@ __global__ void draw_entities_kernel(
 
                 if (player_id_max >= 0) {
                     unsigned int entity_id = player_id_max;
-                //for (int e = 0; e < entities_count; e++) {
-                    //unsigned int entity_id = device_data_players[entities_iddata_position + 1 + e];
-                    //if (entity_id < UINT_MAX) {
-                    struct model* m;
+                    //for (int e = 0; e < entities_count; e++) {
+                        //unsigned int entity_id = device_data_players[entities_iddata_position + 1 + e];
+                        //if (entity_id < UINT_MAX) {
+                    struct model* m = nullptr;
                     if (entities[entity_id].et == ET_PLAYER) {
                         m = &player_models[entities[entity_id].model_id];
                     }
@@ -296,45 +320,47 @@ __global__ void draw_entities_kernel(
                         m = &map_models[entities[entity_id].model_id - 100];
                     }
 
-                    const unsigned int* model_positions = &device_data_assets[m->model_positions];
-                    int upscale = 1;
-                    float upscale_fac = 1.0f;
-                    unsigned int model_position = model_positions[upscale-1];
-                    while (camera_z / (m->model_scale / upscale_fac) < 2 && upscale-1 < m->model_zoom_level_count - 1) {
-                        upscale++;
-                        model_position = model_positions[upscale-1];
-                        upscale_fac *= 2.0f;
-                    }
+                    if (m != nullptr) {
+                        const unsigned int* model_positions = &device_data_assets[m->model_positions];
+                        int upscale = 1;
+                        float upscale_fac = 1.0f;
+                        unsigned int model_position = model_positions[upscale - 1];
+                        while (camera_z / (m->model_scale / upscale_fac) < 2 && upscale - 1 < m->model_zoom_level_count - 1) {
+                            upscale++;
+                            model_position = model_positions[upscale - 1];
+                            upscale_fac *= 2.0f;
+                        }
 
-                    sampling_filter_dim = ceilf(camera_z / (m->model_scale / upscale_fac));
+                        sampling_filter_dim = ceilf(camera_z / (m->model_scale / upscale_fac));
 
-                    float offset_to_model_base_x = (current_game_x - (entities[entity_id].position[0])) / (m->model_scale / upscale_fac);
-                    float offset_to_model_base_y = (current_game_y - (entities[entity_id].position[1])) / (m->model_scale / upscale_fac);
+                        float offset_to_model_base_x = (current_game_x - (entities[entity_id].position[0])) / (m->model_scale / upscale_fac);
+                        float offset_to_model_base_y = (current_game_y - (entities[entity_id].position[1])) / (m->model_scale / upscale_fac);
 
-                    if (offset_to_model_base_x >= 1 && offset_to_model_base_x < m->model_dimensions[0] * upscale_fac - 1 &&
-                        offset_to_model_base_y >= 1 && offset_to_model_base_y < m->model_dimensions[1] * upscale_fac - 1) {
+                        if (offset_to_model_base_x >= 1 && offset_to_model_base_x < m->model_dimensions[0] * upscale_fac - 1 &&
+                            offset_to_model_base_y >= 1 && offset_to_model_base_y < m->model_dimensions[1] * upscale_fac - 1) {
 
-                        unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_position];
-                        unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[(int)(entities[entity_id].orientation / 10) % 36]];
+                            unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_position];
+                            unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[(int)(entities[entity_id].orientation / 10) % 36]];
 
-                        for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
-                            for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
-                                if (offset_to_model_base_x + s_x >= 1 && offset_to_model_base_x + s_x < m->model_dimensions[0] * upscale_fac - 1 &&
-                                    offset_to_model_base_y + s_y >= 1 && offset_to_model_base_y + s_y < m->model_dimensions[1] * upscale_fac - 1
-                                    ) {
-                                    float model_palette_idx_x = offset_to_model_base_x + s_x;
-                                    float model_palette_idx_y = offset_to_model_base_y + s_y;
+                            for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
+                                for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
+                                    if (offset_to_model_base_x + s_x >= 1 && offset_to_model_base_x + s_x < m->model_dimensions[0] * upscale_fac - 1 &&
+                                        offset_to_model_base_y + s_y >= 1 && offset_to_model_base_y + s_y < m->model_dimensions[1] * upscale_fac - 1
+                                        ) {
+                                        float model_palette_idx_x = offset_to_model_base_x + s_x;
+                                        float model_palette_idx_y = offset_to_model_base_y + s_y;
 
-                                    float interpixel_alpha = getInterpixel(p_model, m->model_dimensions[0] * upscale_fac, m->model_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, 3);
+                                        float interpixel_alpha = getInterpixel(p_model, m->model_dimensions[0] * upscale_fac, m->model_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, 3);
                                         if (interpixel_alpha > 0) {
-                                            float interpixel = getInterpixel(p_model, m->model_dimensions[0] * upscale_fac, m->model_dimensions[1] *upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, current_channel);
+                                            float interpixel = getInterpixel(p_model, m->model_dimensions[0] * upscale_fac, m->model_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, current_channel);
                                             output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - interpixel_alpha) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (interpixel_alpha / 255.0f) * interpixel));
                                         }
                                     }
                                 }
                             }
                         }
-                    //}
+                        //}
+                    }
                 }
             }
         }
@@ -342,7 +368,7 @@ __global__ void draw_entities_kernel(
 }
 
 void launch_draw_entities_kernel(
-    const unsigned int* device_data_assets, const unsigned int players_models_position, const unsigned int item_models_position, const unsigned int map_models_position,
+    const unsigned int* device_data_assets, const unsigned int players_models_position, const unsigned int item_models_position, const unsigned int map_models_position, const unsigned int font_position,
     const unsigned int* device_data_rw, const unsigned int entities_position, const unsigned int gd_position_in_bf, const unsigned int gd_data_position_in_bf,
     unsigned int* device_data_output, const unsigned int output_position, const unsigned int output_width, const unsigned int output_height, const unsigned int output_channels,
     const unsigned int camera_x1, const unsigned int camera_y1, const float camera_z, const unsigned int tick_counter) {
@@ -352,7 +378,7 @@ void launch_draw_entities_kernel(
     int threadsPerBlock = 256;
     int blocksPerGrid = (output_width * output_height * 3 + threadsPerBlock - 1) / threadsPerBlock;
 
-    draw_entities_kernel<<<blocksPerGrid, threadsPerBlock>>>(device_data_assets, players_models_position, item_models_position, map_models_position,
+    draw_entities_kernel << <blocksPerGrid, threadsPerBlock >> > (device_data_assets, players_models_position, item_models_position, map_models_position, font_position,
                                 device_data_rw, entities_position, gd_position_in_bf, gd_data_position_in_bf, 
                                 device_data_output, output_position, output_width, output_height, output_channels, 
                                 camera_x1, camera_y1, camera_z, tick_counter);
@@ -368,7 +394,7 @@ void entity_add(string name, enum entity_type et, unsigned int model_id, unsigne
     e.et = et;
     for (int i = 0; i < name.length() && i < 50; i++) {
         e.name[i] = name[i];
-        e.name_len = i;
+        e.name_len = i+1;
     }
     e.orientation = (float)(rand() % 360);
     e.model_id = model_id;

@@ -19,6 +19,7 @@ unsigned int			storm_phase_time	= 0;
 vector<unsigned int>	storm_phase_start_ticks;
 vector<unsigned int>	storm_phase_duration_ticks;
 vector<float>			storm_phase_mapratio;
+vector<float>			storm_phase_dps;
 
 struct storm			storm_last;
 struct storm			storm_current;
@@ -70,18 +71,22 @@ void storm_init(struct bit_field* bf_map, struct bit_field* bf_rw) {
 	storm_phase_start_ticks.emplace_back(1800);
 	storm_phase_duration_ticks.emplace_back(1800);
 	storm_phase_mapratio.emplace_back(0.75f);
+	storm_phase_dps.emplace_back(1.0f);
 
 	storm_phase_start_ticks.emplace_back(1800);
 	storm_phase_duration_ticks.emplace_back(1800);
 	storm_phase_mapratio.emplace_back(0.4f);
+	storm_phase_dps.emplace_back(2.0f);
 
 	storm_phase_start_ticks.emplace_back(1800);
 	storm_phase_duration_ticks.emplace_back(1800);
 	storm_phase_mapratio.emplace_back(0.2f);
+	storm_phase_dps.emplace_back(4.0f);
 
 	storm_phase_start_ticks.emplace_back(1800);
 	storm_phase_duration_ticks.emplace_back(1800);
 	storm_phase_mapratio.emplace_back(0.0f);
+	storm_phase_dps.emplace_back(8.0f);
 
 	float storm_radius = std::min(gm.map_dimensions[0], gm.map_dimensions[1]) * storm_phase_mapratio[0]/2.0f;
 	int storm_center_max_x = (int)floorf(std::max<float>(gm.map_dimensions[0] - storm_radius, 0.0f));
@@ -136,4 +141,11 @@ void storm_next(struct bit_field* bf_map, struct bit_field* bf_rw) {
 			storm_current.y = storm_last.y + delta_y;
 			storm_current.radius = storm_last.radius + ((storm_phase_time - storm_phase_start_ticks[storm_phase_current]) / (float)storm_phase_duration_ticks[storm_phase_current]) * (storm_to.radius - storm_last.radius);
 	}
+}
+
+bool storm_is_in(vector3<float> position) {
+	if (sqrtf((position[0] - storm_current.x) * (position[0] - storm_current.x) + (position[1] - storm_current.y) * (position[1] - storm_current.y)) >= storm_current.radius) {
+		return true;
+	}
+	return false;
 }

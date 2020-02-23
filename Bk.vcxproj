@@ -90,6 +90,7 @@
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="SDLShow.cpp" />
+    <ClCompile Include="TwitchIntegration.cpp" />
     <ClCompile Include="Util.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -106,6 +107,7 @@
     <ClInclude Include="Player.hpp" />
     <ClInclude Include="SDLShow.hpp" />
     <ClInclude Include="Storm.hpp" />
+    <ClInclude Include="TwitchIntegration.hpp" />
     <ClInclude Include="UI.hpp" />
     <ClInclude Include="Util.hpp" />
     <ClInclude Include="Vector2.hpp" />
