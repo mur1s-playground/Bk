@@ -275,7 +275,14 @@ __global__ void draw_entities_kernel(
                                 if (m->mt == MT_LOOTABLE_ITEM) {
                                     if (offset_to_model_base_x <= 22 * camera_z || offset_to_model_base_y <= 22 * camera_z || offset_to_model_base_x >= m->model_dimensions[0] * upscale_fac - (22 * camera_z) || offset_to_model_base_y >= m->model_dimensions[1] * upscale_fac - (22 * camera_z)) {
                                         float alpha_item = 150;
-                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = (unsigned char)(((255 - alpha_item) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (alpha_item / 255.0f) * 255));
+                                        if (m->id == 50) {
+                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = (unsigned char)(((255 - alpha_item) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (alpha_item / 255.0f) * 255));
+                                        } else if (m->id == 51) {
+                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = (unsigned char)(((255 - alpha_item) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (alpha_item / 255.0f) * 255));
+                                        } else if (m->id == 52) {
+                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = (unsigned char)(((255 - alpha_item) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (alpha_item / 255.0f) * 255));
+                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = (unsigned char)(((255 - alpha_item) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (alpha_item / 255.0f) * 146));
+                                        }
                                     }
                                 }
 
@@ -392,9 +399,14 @@ void launch_draw_entities_kernel(
 void entity_add(string name, enum entity_type et, unsigned int model_id, unsigned int model_z) {
     struct entity e;
     e.et = et;
+    e.force = { 0.0f, 0.0f };
+    e.velocity = { 0.0f, 0.0f };
     for (int i = 0; i < name.length() && i < 50; i++) {
         e.name[i] = name[i];
         e.name_len = i+1;
+    }
+    for (int i = name.length(); i < 50; i++) {
+        e.name[i] = '\0';
     }
     e.orientation = (float)(rand() % 360);
     e.model_id = model_id;

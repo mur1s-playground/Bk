@@ -68,8 +68,8 @@ void launch_draw_storm_kernel(unsigned int* device_output_data, const unsigned i
 void storm_init(struct bit_field* bf_map, struct bit_field* bf_rw) {
 	gm.map_storm_pathing = bit_field_add_bulk_zero(bf_rw, (unsigned int)ceilf(gm.map_dimensions[0]*gm.map_dimensions[1]*2)/(float)sizeof(unsigned int))+1;
 
-	storm_phase_start_ticks.emplace_back(1800);
-	storm_phase_duration_ticks.emplace_back(1800);
+	storm_phase_start_ticks.emplace_back(5400);
+	storm_phase_duration_ticks.emplace_back(3600);
 	storm_phase_mapratio.emplace_back(0.75f);
 	storm_phase_dps.emplace_back(1.0f);
 
@@ -144,8 +144,59 @@ void storm_next(struct bit_field* bf_map, struct bit_field* bf_rw) {
 }
 
 bool storm_is_in(vector3<float> position) {
-	if (sqrtf((position[0] - storm_current.x) * (position[0] - storm_current.x) + (position[1] - storm_current.y) * (position[1] - storm_current.y)) >= storm_current.radius) {
+	if (sqrtf((position[0]+16 - storm_current.x) * (position[0]+16 - storm_current.x) + (position[1]+16 - storm_current.y) * (position[1]+16 - storm_current.y)) >= storm_current.radius - 16) {
 		return true;
 	}
 	return false;
+}
+
+float storm_next_move_time(vector3<float> position, float dist_per_tick) {
+	float dist = sqrtf((position[0] + 16 - storm_to.x) * (position[0] + 16 - storm_to.x) + (position[1] + 16 - storm_to.y) * (position[1] + 16 - storm_to.y)) + 1e-5;
+	float dist_to_next_circle =  dist - storm_to.radius;
+	if (dist_to_next_circle < -16.0f) {
+		return 0.0f;
+	} else {
+		for (int i = storm_phase_time; i < storm_phase_start_ticks[storm_phase_current] + storm_phase_duration_ticks[storm_phase_current]; i++) {
+			float dist = sqrtf((storm_to.x - position[0]) * (storm_to.x - position[0]) + (storm_to.y - position[1]) * (storm_to.y - position[1])) + 1e-5;
+
+			float delta_x = dist_per_tick * ((storm_to.x - position[0]) / dist);
+			float delta_y = dist_per_tick * ((storm_to.y - position[1]) / dist);
+
+			float p_x_at_i = position[0] + 16 + (i-storm_phase_time) * delta_x;
+			float p_y_at_i = position[1] + 16 + (i-storm_phase_time) * delta_y;
+
+			float storm_x_at_i;
+			float storm_y_at_i;
+			float storm_radius_at_i;
+			if (i < storm_phase_start_ticks[storm_phase_current]) {
+				storm_x_at_i = storm_last.x;
+				storm_y_at_i = storm_last.y;
+				storm_radius_at_i = storm_last.radius;
+			} else {
+				storm_x_at_i = storm_last.x + (int)(((i - storm_phase_start_ticks[storm_phase_current]) / (float)storm_phase_duration_ticks[storm_phase_current]) * ((int)storm_to.x - (int)storm_last.x));
+				storm_y_at_i = storm_last.y + (int)(((i - storm_phase_start_ticks[storm_phase_current]) / (float)storm_phase_duration_ticks[storm_phase_current]) * ((int)storm_to.y - (int)storm_last.y));
+				storm_radius_at_i = storm_last.radius + ((i - storm_phase_start_ticks[storm_phase_current]) / (float)storm_phase_duration_ticks[storm_phase_current]) * (storm_to.radius - storm_last.radius);
+			}
+
+			if (storm_radius_at_i < 32.0f) {
+				storm_radius_at_i = 32.0f;
+			}
+			float dist_from_center = sqrtf((p_x_at_i - storm_x_at_i) * (p_x_at_i - storm_x_at_i) + (p_y_at_i - storm_y_at_i) * (p_y_at_i - storm_y_at_i));
+			float dist_from_target_center = sqrtf((p_x_at_i - storm_to.x) * (p_x_at_i - storm_to.x) + (p_y_at_i - storm_to.y) * (p_y_at_i - storm_to.y));
+			if (dist_from_center >= storm_radius_at_i - 16.0f) {
+				return 1.0f;
+			} else if (dist_from_target_center < storm_to.radius - 16.0f) {
+				return 0.0f;
+			}
+		}
+		/*
+		if (((storm_phase_start_ticks[storm_phase_current] + storm_phase_duration_ticks[storm_phase_current]) - storm_phase_time) * dist_per_tick < dist_to_next_circle - 16.0f) {
+			return 1.0f;
+		}
+		if (sqrtf((position[0]+16 - storm_last.x) * (position[0]+16 - storm_last.x) + (position[1]+16 - storm_last.y) * (position[1]+16 - storm_last.y)) - storm_last.radius > -16.0f) {
+			return 1.0f;
+		}
+		*/
+	}
+	return 0.0f;
 }

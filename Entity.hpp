@@ -1,6 +1,7 @@
 #ifndef ENTITY_HPP
 #define ENTITY_HPP
 
+#include "Vector2.hpp"
 #include "Vector3.hpp"
 #include <vector>
 #include <string>
@@ -20,6 +21,8 @@ struct entity {
 
 	struct vector3<float>	position;
 	float					orientation;
+	struct vector2<float>	force;
+	struct vector2<float>	velocity;
 
 	unsigned int			model_id;
 	unsigned int			model_z;

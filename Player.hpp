@@ -30,6 +30,11 @@ struct player {
 	char name[50];
 	unsigned int name_len;
 
+	bool					alive;
+
+	int						damage_dealt;
+	int						kills;
+
 	int						health;
 	int						shield;
 

@@ -49,13 +49,19 @@ void player_add(string name, enum player_type pt, unsigned int entity_id) {
     if (it != players.end()) {
     } else {
         struct player p;
+        p.alive = true;
         p.pt = pt;
+        p.damage_dealt = 0;
+        p.kills = 0;
         for (int i = 0; i < name.length() && i < 50; i++) {
             p.name[i] = name[i];
-            p.name_len = i;
-
+            p.name_len = i+1;
+        }
+        for (int i = name.length(); i < 50; i++) {
+            p.name[i] = '\0';
         }
         p.health = 100;
+        p.shield = 0;
         for (int i = 0; i < 6; i++) {
             p.inventory[i].item_id = UINT_MAX;
             p.inventory[i].item_param = 0;

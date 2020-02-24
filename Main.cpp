@@ -127,6 +127,68 @@ void start_game() {
 		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { item_models[0].model_scale, item_models[0].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[0]), entities.size() - 1);
 	}
 
+	//spawn shield
+	for (int i = 0; i < players.size()/2; i++) {
+		stringstream ss_p;
+		ss_p << i;
+		entity_add("bottle_" + ss_p.str(), ET_ITEM, 51, 0);
+		struct entity* cur_e = &entities[entities.size() - 1];
+		bool found_spawn = false;
+		float x = 0;
+		float y = 0;
+		float z = 0;
+		while (!found_spawn) {
+			x = 10.0f + rand() % (gm.map_dimensions[0] - 32);
+			y = 10.0f + rand() % (gm.map_dimensions[1] - 32);
+			z = 0.0f;
+			unsigned int grid_index = grid_get_index(bf_rw.data, gd.position_in_bf, { x, y, z });
+			if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
+				unsigned char* pathables = (unsigned char*)&bf_assets.data[gm.map_pathable_position];
+				unsigned char pathable = pathables[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
+				if (pathable > 0) {
+					unsigned char* loot_spawn_probabilities = (unsigned char*)&bf_assets.data[gm.map_loot_probabilities_position];
+					unsigned char loot_spawn_probability = loot_spawn_probabilities[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
+					if (rand() / (float)RAND_MAX * 255 <= loot_spawn_probability) {
+						found_spawn = true;
+					}
+				}
+			}
+		}
+		cur_e->position = { x, y, z };
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { item_models[1].model_scale, item_models[1].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[1]), entities.size() - 1);
+	}
+
+	//spawn bandages
+	for (int i = 0; i < players.size() / 2; i++) {
+		stringstream ss_p;
+		ss_p << i;
+		entity_add("bandage_" + ss_p.str(), ET_ITEM, 52, 0);
+		struct entity* cur_e = &entities[entities.size() - 1];
+		bool found_spawn = false;
+		float x = 0;
+		float y = 0;
+		float z = 0;
+		while (!found_spawn) {
+			x = 10.0f + rand() % (gm.map_dimensions[0] - 32);
+			y = 10.0f + rand() % (gm.map_dimensions[1] - 32);
+			z = 0.0f;
+			unsigned int grid_index = grid_get_index(bf_rw.data, gd.position_in_bf, { x, y, z });
+			if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
+				unsigned char* pathables = (unsigned char*)&bf_assets.data[gm.map_pathable_position];
+				unsigned char pathable = pathables[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
+				if (pathable > 0) {
+					unsigned char* loot_spawn_probabilities = (unsigned char*)&bf_assets.data[gm.map_loot_probabilities_position];
+					unsigned char loot_spawn_probability = loot_spawn_probabilities[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
+					if (rand() / (float)RAND_MAX * 255 <= loot_spawn_probability) {
+						found_spawn = true;
+					}
+				}
+			}
+		}
+		cur_e->position = { x, y, z };
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { item_models[2].model_scale, item_models[2].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[2]), entities.size() - 1);
+	}
+
 	entities_upload(&bf_rw);
 
 	bit_field_update_device(&bf_rw, 0);
@@ -327,6 +389,296 @@ int main(int argc, char** argv) {
 		tf = clock();
 		fps++;
 
+		if (game_started) {
+			struct entity* es = (struct entity*) & bf_rw.data[entities_position];
+			map<string, struct player>::iterator players_it = players.begin();
+			float player_dist_per_tick = 1 / 5.0f;
+			int orientation_change_per_tick = 3;
+			while (players_it != players.end()) {
+				struct player* pl = &players_it->second;
+				if (pl->alive) {
+					if (pl->entity_id < UINT_MAX) {
+						struct entity* en = &es[pl->entity_id];
+						int has_inv_space = 0;
+						int has_gun = -1;
+						for (int inv = 0; inv < 6; inv++) {
+							if (pl->inventory[inv].item_id == UINT_MAX) {
+								has_inv_space++;
+							} else if (pl->inventory[inv].item_id == 50) {
+								has_gun = inv;
+								if (pl->inventory[inv].item_param % 15 != 0) {
+									pl->inventory[inv].item_param++;
+								}
+							} else if (pl->inventory[inv].item_id == 51) {
+								if (pl->shield <= 75 && pl->inventory[inv].item_param != 0) {
+									//printf("shiedling\n");
+									pl->shield += 25;
+									pl->inventory[inv].item_param--;
+								}
+								if (pl->inventory[inv].item_param == 0) {
+									pl->inventory[inv].item_id = UINT_MAX;
+									has_inv_space++;
+								}
+							} else if (pl->inventory[inv].item_id == 52) {
+								if (pl->health <= 75 && pl->inventory[inv].item_param != 0) {
+									//printf("healing\n");
+									pl->health += 25;
+									pl->inventory[inv].item_param--;
+								}
+								if (pl->inventory[inv].item_param == 0) {
+									pl->inventory[inv].item_id = UINT_MAX;
+									has_inv_space++;
+								}
+							}
+						}
+
+						//current position
+						int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { en->position[0], en->position[1], 0.0f });
+						if (gi > -1) {
+							int g_data_pos = bf_rw.data[gd.data_position_in_bf + 1 + gi];
+							if (g_data_pos > 0) {
+								int element_count = bf_rw.data[g_data_pos];
+								for (int e = 0; e < element_count; e++) {
+									unsigned int entity_id = bf_rw.data[g_data_pos + 1 + e];
+									if (entity_id != pl->entity_id && entity_id < UINT_MAX) {
+										struct entity* etc = &es[entity_id];
+										if (etc->et == ET_ITEM) {
+											if (etc->model_id == 50) { //colt
+												if (has_gun < 0) {
+													for (int inv = 0; inv < 6; inv++) {
+														if (pl->inventory[inv].item_id == UINT_MAX) {
+															//printf("picked up a gun\n");
+															pl->inventory[inv].item_id = 50;
+															pl->inventory[inv].item_param = 5;
+															grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[0].model_scale, item_models[0].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[0]), entity_id);
+															break;
+														}
+													}
+												}
+											} else if (etc->model_id == 51) { //shield
+												if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+													for (int inv = 0; inv < 6; inv++) {
+														if (pl->inventory[inv].item_id == UINT_MAX) {
+															//printf("picked up shield\n");
+															pl->inventory[inv].item_id = 51;
+															pl->inventory[inv].item_param = 2;
+															grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[1].model_scale, item_models[1].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[1]), entity_id);
+															break;
+														}
+													}
+												}
+											} else if (etc->model_id == 52) { //bandage
+												if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+													for (int inv = 0; inv < 6; inv++) {
+														if (pl->inventory[inv].item_id == UINT_MAX) {
+															//printf("picked up bandage\n");
+															pl->inventory[inv].item_id = 52;
+															pl->inventory[inv].item_param = 5;
+															grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[2].model_scale, item_models[2].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[2]), entity_id);
+															break;
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+						float delta_x = 0.0f;
+						float delta_y = 0.0f;
+
+						if (storm_next_move_time(en->position, player_dist_per_tick) == 1.0f) {
+							float dist = sqrtf((storm_to.x - en->position[0]) * (storm_to.x - en->position[0]) + (storm_to.y - en->position[1]) * (storm_to.y - en->position[1])) + 1e-5;
+
+							delta_x = player_dist_per_tick * ((storm_to.x - en->position[0]) / dist);
+							delta_y = player_dist_per_tick * ((storm_to.y - en->position[1]) / dist);
+						}
+
+						struct vector2<int> spiral_pos = { (int)en->position[0], (int)en->position[1] + 32 };
+						struct vector2<int> spiral_dir[4] = { {0, 32}, { 32, 0 }, { 0, -32 }, { -32, 0 } };
+						int					spiral_dir_idx = 1;
+						struct vector2<int> spiral_dir_current = spiral_dir[spiral_dir_idx];
+						int					spiral_steps_last = 1;
+						int					spiral_steps = 1;
+						int					spiral_steps_counter = 0;
+
+						while (spiral_steps < 10) {
+							//process grid
+							int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { (float)spiral_pos[0], (float)spiral_pos[1], 0.0f });
+							if (gi > -1) {
+								int g_data_pos = bf_rw.data[gd.data_position_in_bf + 1 + gi];
+								if (g_data_pos > 0) {
+									float dist = sqrtf((spiral_pos[0] - (int)en->position[0]) * (spiral_pos[0] - (int)en->position[0]) + (spiral_pos[1] - (int)en->position[1]) * (spiral_pos[1] - (int)en->position[1])) + 1e-5;
+									int element_count = bf_rw.data[g_data_pos];
+									for (int e = 0; e < element_count; e++) {
+										unsigned int entity_id = bf_rw.data[g_data_pos + 1 + e];
+										if (entity_id != pl->entity_id && entity_id < UINT_MAX) {
+											struct entity* etc = &es[entity_id];
+											if (etc->et == ET_ITEM && delta_x == 0 && delta_y == 0) {
+												if (!storm_is_in({ (float)spiral_pos[0], (float)spiral_pos[1], 0.0f })) {
+													if (etc->model_id == 50) { //colt
+														if (has_gun < 0) {
+															delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
+															delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
+														}
+													} else if (etc->model_id == 51) { // shield
+														if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+															delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
+															delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
+														}
+													} else if (etc->model_id == 52) { // bandage
+														if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+															delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
+															delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
+														}
+													}
+												}
+											} else if (etc->et == ET_PLAYER && has_gun >= 0) {
+												if (dist / 32 < 5 && pl->inventory[has_gun].item_param % 15 == 0) {
+													if (players[etc->name].health > 0) {
+														pl->inventory[has_gun].item_param++;
+														float hit = (rand() / (float)RAND_MAX);
+														//printf("player: %s shoots at %s", pl->name, etc->name);
+														if (hit < 0.8) {
+															if (players[etc->name].shield > 0) {
+																players[etc->name].shield -= 10;
+															} else {
+																players[etc->name].health -= 10;
+															}
+															pl->damage_dealt += 10;
+															//printf(" hit");
+															if (players[etc->name].health <= 0) {
+																pl->kills++;
+																//printf(" & kill");
+															}
+														}
+														//printf("\n");
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+							//spiral_pos_next
+							spiral_pos = { spiral_pos[0] + spiral_dir_current[0], spiral_pos[1] + spiral_dir_current[1] };
+							spiral_steps--;
+							if (spiral_steps == 0) {
+								spiral_steps_counter++;
+								spiral_dir_current = spiral_dir[(spiral_dir_idx + 1) % 4];
+								spiral_dir_idx++;
+								spiral_steps = spiral_steps_last;
+								if (spiral_steps_counter == 2) {
+									spiral_steps++;
+									spiral_steps_counter = 0;
+								}
+								spiral_steps_last = spiral_steps;
+							}
+						}
+						int target_orientation = en->orientation;
+						if (delta_x == 0 && delta_y == 0) {
+							if (rand() / (float)RAND_MAX < 0.1) {
+								int fac = 1;
+								if (rand() / (float)RAND_MAX < 0.20) fac = -1;
+								en->orientation += 3 * fac;
+							}
+							delta_x = -1*player_dist_per_tick*cos(3.1415/180.0f * (en->orientation+90));
+							delta_y = -1*player_dist_per_tick*sin(3.1415/180.0f * (en->orientation-90));
+
+							if (en->position[0] + delta_x < 32) {
+								delta_x = 0.0f;
+								delta_y = 0.0f;
+								target_orientation = 45 + (int)(rand()/(float) RAND_MAX * 90);
+								en->orientation = target_orientation;
+							} 
+							if (en->position[0] + delta_x >= gm.map_dimensions[0] - 32) {
+								delta_x = 0.0f;
+								delta_y = 0.0f;
+								target_orientation = 315 - (int)(rand() / (float)RAND_MAX * 90);
+								en->orientation = target_orientation;
+							}
+							if (en->position[1] + delta_y < 32) {
+								delta_x = 0.0f;
+								delta_y = 0.0f;
+								target_orientation = 315 + (int)(rand() / (float)RAND_MAX * 90);
+								en->orientation = target_orientation;
+							}
+							if (en->position[1] + delta_y >= gm.map_dimensions[1] - 32) {
+								delta_x = 0.0f;
+								delta_y = 0.0f;
+								target_orientation = 135 + (int)(rand() / (float)RAND_MAX * 90);
+								en->orientation = target_orientation;
+							}
+
+							if (storm_is_in({ en->position[0] + delta_x, en->position[1] + delta_y, 0.0f })) {
+								delta_x = 0.0f;
+								delta_y = 0.0f;
+								target_orientation+=3;
+							}
+						} else {
+							target_orientation = (int)roundf(atan2(-delta_y, delta_x) * (180 / 3.1415f)) + 90;
+						}
+						if (target_orientation < 0) {
+							target_orientation += 360;
+						}
+						if (abs(en->orientation - target_orientation) > orientation_change_per_tick) {
+							if (en->orientation > target_orientation) {
+								en->orientation -= orientation_change_per_tick;
+							} else {
+								en->orientation += orientation_change_per_tick;
+							}
+						} else {
+							en->orientation = target_orientation;
+							//object itself
+							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
+							//object text
+							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+							en->force[0] = delta_x;
+							en->force[1] = delta_y;
+
+							float val_1 = exp(1 / (pow(en->force[0] - en->velocity[0], 2.0) + 1)) / exp(1);
+							float val_1b = 1 - val_1;
+
+							float val_2 = exp(1 / (pow(en->force[1] - en->velocity[1], 2.0) + 1)) / exp(1);
+							float val_2b = 1 - val_2;
+
+							float a = en->velocity[0] * val_1b + en->force[0] * val_1;
+							float b = en->velocity[1] * val_2b + en->force[1] * val_2;
+
+							en->velocity[0] = (a);
+							en->velocity[1] = (b);
+
+							en->position[0] += en->velocity[0];
+							en->position[1] += en->velocity[1];
+
+							//object itself
+							grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
+							//object text
+							grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+						}
+					}
+				}
+				players_it++;
+			}
+			players_it = players.begin();
+			while (players_it != players.end()) {
+				struct player* pl = &players_it->second;
+				if (pl->alive) {
+					if (pl->health <= 0) {
+						struct entity* en = &es[pl->entity_id];
+						pl->alive = false;
+						//object itself
+						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
+						//object text
+						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+						pl->entity_id = UINT_MAX;
+					}
+				}
+				players_it++;
+			}
+		}
+
 		if (sec >= 1.0) {
 			if (game_started) {
 				//struct player* players_ptr = (struct player*) &bf_rw.data[players_position];
@@ -335,18 +687,24 @@ int main(int argc, char** argv) {
 				while (players_it != players.end()) {
 					//for (int i = 0; i < players.size(); i++) {
 					struct player* pl = &players_it->second;
-					if (pl->entity_id < UINT_MAX) {
-						//printf("%i ", pl->entity_id);
-						struct entity* en = &es[pl->entity_id];
-						if (storm_is_in(en->position)) {
-							pl->health -= storm_phase_dps[storm_phase_current];
+					if (pl->alive) {
+						if (pl->damage_dealt > 0) {
+							printf("name: %s, health: %d, shield: %d, damage: %d, kills: %d\n", pl->name, pl->health, pl->shield, pl->damage_dealt, pl->kills);
 						}
-						if (pl->health < 0) {
-							//object itself
-							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
-							//object text
-							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
-							pl->entity_id = UINT_MAX;
+						if (pl->entity_id < UINT_MAX) {
+							//printf("%i ", pl->entity_id);
+							struct entity* en = &es[pl->entity_id];
+							if (storm_is_in(en->position)) {
+								pl->health -= storm_phase_dps[storm_phase_current];
+							}
+							if (pl->health <= 0) {
+								pl->alive = false;
+								//object itself
+								grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
+								//object text
+								grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+								pl->entity_id = UINT_MAX;
+							}
 						}
 					}
 					players_it++;
