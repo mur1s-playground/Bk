@@ -19,6 +19,10 @@
 #include "IRCClient.h"
 #include "IRCHandler.h"
 
+std::atomic<bool> player_reg_active = true;
+std::string cache_dir;
+std::vector<std::string> players;
+
 std::vector<std::string> split(std::string const& text, char sep)
 {
     std::vector<std::string> tokens;
@@ -150,8 +154,104 @@ void IRCClient::Parse(std::string data)
         IRCCommandHandler& cmdHandler = ircCommandTable[commandIndex];
         (this->*cmdHandler.handler)(ircMessage);
     }
-    else if (_debug)
-        std::cout << original << std::endl;
+    else if (_debug) {
+        //std::cout << "debug msg " << original << std::endl;
+        size_t prefix_end_pos = original.find_first_of(' ');
+        if (prefix_end_pos != std::string::npos) {
+            std::string prefix = original.substr(0, prefix_end_pos);
+            size_t nick_end_pos = original.find_first_of(' ', prefix_end_pos + 1);
+            if (nick_end_pos != std::string::npos) {
+                std::string nick = original.substr(prefix_end_pos + 2, nick_end_pos - prefix_end_pos - 1);
+                std::string rest = original.substr(nick_end_pos+1);
+
+                size_t message_start_pos = original.find_first_of(':', nick_end_pos + 1);
+                if (message_start_pos != std::string::npos) {
+                    //std::cout << "PREFIX:" << prefix << std::endl;
+
+                    size_t nick_end_part_pos = nick.find_first_of('!');
+
+                    if (nick_end_part_pos != std::string::npos) {
+                        nick = nick.substr(0, nick_end_part_pos);
+                        std::cout << "NICK:" << nick << std::endl;
+
+                        std::string msg = original.substr(message_start_pos + 1);
+                        std::cout << "MSG:" << msg << std::endl << std::endl;
+
+                        if (player_reg_active) {
+                                if (msg == "!add" || msg == "!play") {
+                                    if (std::count(players.begin(), players.end(), nick) == 0) {
+                                        byte buffer[4096];
+                                        DWORD dwBytesWritten, dwPos;
+                                        std::string filepath = cache_dir + "\\players.txt";
+                                        HANDLE hAppend = CreateFile(TEXT(filepath.c_str()),
+                                            FILE_APPEND_DATA,         // open for writing
+                                            FILE_SHARE_READ,          // allow multiple readers
+                                            NULL,                     // no security
+                                            OPEN_ALWAYS,              // open or create
+                                            FILE_ATTRIBUTE_NORMAL,    // normal file
+                                            NULL);                    // no attr. template
+                                        if (hAppend == INVALID_HANDLE_VALUE) {
+                                            printf("could not open players.txt");
+                                        } else {
+                                            dwPos = SetFilePointer(hAppend, 0, NULL, FILE_END);
+                                            int nicklen_bytes = (nick.length() + 1);
+                                            std::string linetoadd = nick + "\n";
+                                            LockFile(hAppend, dwPos, 0, nicklen_bytes, 0);
+                                            WriteFile(hAppend, linetoadd.c_str(), nicklen_bytes, &dwBytesWritten, NULL);
+                                            UnlockFile(hAppend, dwPos, 0, nicklen_bytes, 0);
+                                            CloseHandle(hAppend);
+                                            players.push_back(nick);
+                                        }
+                                    }
+                                }
+                        }
+
+                        size_t bits_pos = prefix.find("bits=");
+                        if (bits_pos != std::string::npos && prefix.length() > bits_pos+4) {
+                            std::string bits = prefix.substr(bits_pos + 4);
+                            size_t bits_end_pos = bits.find_first_of(';');
+                            if (bits_end_pos != std::string::npos) {
+                                bits = bits.substr(0, bits_end_pos);
+                                std::cout << "BITS:" << bits << std::endl;
+
+                                byte buffer[4096];
+                                DWORD dwBytesWritten, dwPos;
+                                std::string filepath = cache_dir + "\\bits.txt";
+                                HANDLE hAppend = CreateFile(TEXT(filepath.c_str()),
+                                    FILE_APPEND_DATA,         // open for writing
+                                    FILE_SHARE_READ,          // allow multiple readers
+                                    NULL,                     // no security
+                                    OPEN_ALWAYS,              // open or create
+                                    FILE_ATTRIBUTE_NORMAL,    // normal file
+                                    NULL);                    // no attr. template
+                                if (hAppend == INVALID_HANDLE_VALUE) {
+                                    printf("could not open bits.txt");
+                                } else {
+                                    dwPos = SetFilePointer(hAppend, 0, NULL, FILE_END);
+                                    int nicklen_bytes = (nick.length() + 1 + bits.length() + 2);
+                                    std::string linetoadd = nick + ":" + bits + ":";
+                                    bool add = false;
+                                    if (msg == "!shield") {
+                                        linetoadd += "s\n";
+                                        add = true;
+                                    } else if (msg == "!bandage") {
+                                        linetoadd += "b\n";
+                                        add = true;
+                                    }
+                                    if (add) {
+                                        LockFile(hAppend, dwPos, 0, nicklen_bytes, 0);
+                                        WriteFile(hAppend, linetoadd.c_str(), nicklen_bytes, &dwBytesWritten, NULL);
+                                        UnlockFile(hAppend, dwPos, 0, nicklen_bytes, 0);
+                                    }
+                                    CloseHandle(hAppend);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Try to call hook (if any matches)
     CallHook(command, ircMessage);

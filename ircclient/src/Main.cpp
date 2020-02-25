@@ -233,6 +233,7 @@ int main(int argc, char* argv[])
 
                 while (client.Connected() && running) {
                     if (!joined) {
+                        client.SendIRC("CAP REQ :twitch.tv/tags");
                         client.SendIRC("join #" + twitch_name);
                         joined = true;
                     }

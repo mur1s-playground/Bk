@@ -19,6 +19,10 @@ extern bool game_started;
 
 extern bool running;
 
+extern map<string, int>				bits_spent;
+extern map<string, int>				bits_shield;
+extern map<string, int>				bits_bandage;
+
 void start_game();
 
 #endif

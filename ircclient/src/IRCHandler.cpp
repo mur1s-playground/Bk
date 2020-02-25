@@ -18,10 +18,6 @@
 #include <vector>
 #include <algorithm>
 
-std::atomic<bool> player_reg_active = true;
-std::string cache_dir;
-std::vector<std::string> players;
-
 IRCCommandHandler ircCommandTable[NUM_IRC_CMDS] =
 {
     { "PRIVMSG",            &IRCClient::HandlePrivMsg                   },
@@ -88,7 +84,11 @@ void IRCClient::HandlePrivMsg(IRCMessage message)
     }
 
     if (to[0] == '#') {
-        std::cout << "From " + message.prefix.nick << " @ " + to + ": " << text << std::endl;
+        //std::cout << "From " + message.prefix.nick << " @ " + to + ": " << text << std::endl;
+
+        std::cout << "TO: " + to + "\nTEXT: " << text << std::endl;
+
+        /*
         if (player_reg_active) {
             if (text[0] == '!') {
                 if (text == "!add" || text == "!play") {
@@ -120,6 +120,7 @@ void IRCClient::HandlePrivMsg(IRCMessage message)
                 }
             }
         }
+        */
     } else {
         std::cout << "From " + message.prefix.nick << ": " << text << std::endl;
     }
@@ -187,6 +188,6 @@ void IRCClient::HandleServerMessage(IRCMessage message)
     std::vector<std::string>::const_iterator itr = message.parameters.begin();
     ++itr; // skip the first parameter (our nick)
     for (; itr != message.parameters.end(); ++itr)
-        std::cout << *itr << " ";
+        std::cout << *itr;
     std::cout << std::endl;
 }

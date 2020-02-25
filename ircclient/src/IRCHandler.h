@@ -18,8 +18,6 @@
 
 #include "IRCClient.h"
 
-#include <atomic>
-
 #define NUM_IRC_CMDS 26
 
 struct IRCCommandHandler
@@ -29,8 +27,6 @@ struct IRCCommandHandler
 };
 
 extern IRCCommandHandler ircCommandTable[NUM_IRC_CMDS];
-extern std::atomic<bool> player_reg_active;
-extern std::string cache_dir;
 
 inline int GetCommandHandler(std::string command)
 {

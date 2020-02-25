@@ -21,6 +21,8 @@
 #include <chrono>
 #include <thread>
 #include <random>
+#include <map>
+#include <utility>
 
 
 
@@ -36,6 +38,13 @@ struct vector3<float> camera;
 struct vector2<unsigned int> resolution;
 
 struct vector2<unsigned int> map_dimensions;
+
+int	max_bits_per_game = 0;
+int bits_per_shield = 0;
+int bits_per_bandage = 0;
+map<string, int>				bits_spent;
+map<string, int>				bits_shield;
+map<string, int>				bits_bandage;
 
 int target_ticks_per_second = 30;
 unsigned int tick_counter = 0;
@@ -432,6 +441,52 @@ int main(int argc, char** argv) {
 							}
 						}
 
+						if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+							string name_str(en->name);
+							map<string, int>::iterator bit_it = bits_spent.find(name_str);
+							if (bit_it != bits_spent.end()) {
+								int spent = bit_it->second;
+								if (bits_spent[name_str] < max_bits_per_game) {
+									map<string, int>::iterator bit_it_s = bits_shield.find(name_str);
+									if (bit_it_s != bits_shield.end()) {
+										if (bit_it_s->second >= bits_per_shield) {
+											for (int inv = 0; inv < 6; inv++) {
+												if (pl->inventory[inv].item_id == UINT_MAX) {
+													pl->inventory[inv].item_id = 51;
+													pl->inventory[inv].item_param = 2;
+													has_inv_space--;
+													bits_shield[name_str] -= bits_per_shield;
+													bits_spent[name_str] += bits_per_shield;
+													//printf("bought shield, spent %i\n", bits_spent[name_str]);
+													break;
+												}
+											}
+										}
+									}
+								}
+								if (bits_spent[name_str] < max_bits_per_game) {
+									if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+										map<string, int>::iterator bit_it_b = bits_bandage.find(name_str);
+										if (bit_it_b != bits_bandage.end()) {
+											if (bit_it_b->second >= bits_per_bandage) {
+												for (int inv = 0; inv < 6; inv++) {
+													if (pl->inventory[inv].item_id == UINT_MAX) {
+														pl->inventory[inv].item_id = 52;
+														pl->inventory[inv].item_param = 5;
+														has_inv_space--;
+														bits_bandage[name_str] -= bits_per_bandage;
+														bits_spent[name_str] += bits_per_bandage;
+														//printf("bought bandage, spent %i\n", bits_spent[name_str]);
+														break;
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+
 						//current position
 						int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { en->position[0], en->position[1], 0.0f });
 						if (gi > -1) {
@@ -681,6 +736,7 @@ int main(int argc, char** argv) {
 
 		if (sec >= 1.0) {
 			if (game_started) {
+				twitch_update_bits();
 				//struct player* players_ptr = (struct player*) &bf_rw.data[players_position];
 				struct entity* es = (struct entity*) & bf_rw.data[entities_position];
 				map<string, struct player>::iterator players_it = players.begin();
@@ -689,7 +745,7 @@ int main(int argc, char** argv) {
 					struct player* pl = &players_it->second;
 					if (pl->alive) {
 						if (pl->damage_dealt > 0) {
-							printf("name: %s, health: %d, shield: %d, damage: %d, kills: %d\n", pl->name, pl->health, pl->shield, pl->damage_dealt, pl->kills);
+							//printf("name: %s, health: %d, shield: %d, damage: %d, kills: %d\n", pl->name, pl->health, pl->shield, pl->damage_dealt, pl->kills);
 						}
 						if (pl->entity_id < UINT_MAX) {
 							//printf("%i ", pl->entity_id);
@@ -723,7 +779,33 @@ int main(int argc, char** argv) {
 									twitch_name += uis["settings"].ui_elements[uc].value[ca];
 								}
 							}
-							break;
+						}
+						if (uis["settings"].ui_elements[uc].name == "bits_bandage") {
+							string bits_ = "";
+							for (int ca = 0; ca < 50; ca++) {
+								if (uis["settings"].ui_elements[uc].value[ca] != '\0') {
+									bits_ += uis["settings"].ui_elements[uc].value[ca];
+								}
+							}
+							bits_per_bandage = stoi(bits_);
+						}
+						if (uis["settings"].ui_elements[uc].name == "bits_shield") {
+							string bits_ = "";
+							for (int ca = 0; ca < 50; ca++) {
+								if (uis["settings"].ui_elements[uc].value[ca] != '\0') {
+									bits_ += uis["settings"].ui_elements[uc].value[ca];
+								}
+							}
+							bits_per_shield = stoi(bits_);
+						}
+						if (uis["settings"].ui_elements[uc].name == "bits_game") {
+							string bits_ = "";
+							for (int ca = 0; ca < 50; ca++) {
+								if (uis["settings"].ui_elements[uc].value[ca] != '\0') {
+									bits_ += uis["settings"].ui_elements[uc].value[ca];
+								}
+							}
+							max_bits_per_game = stoi(bits_);
 						}
 					}
 					if (twitch_name != "") {

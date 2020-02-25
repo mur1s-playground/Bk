@@ -19,7 +19,12 @@
 #include <string>
 #include <vector>
 #include <list>
+#include <atomic>
 #include "IRCSocket.h"
+
+extern std::atomic<bool> player_reg_active;
+extern std::string cache_dir;
+extern std::vector<std::string> players;
 
 class IRCClient;
 
