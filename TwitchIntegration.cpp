@@ -32,7 +32,7 @@ void twitch_update_players() {
         NULL);                    // no attr. template
 
     if (hFile == INVALID_HANDLE_VALUE) {
-        printf("Could not open players.txt.");
+        printf("Could not open players.txt.\n");
     } {
 
         string file_content = "";
@@ -57,13 +57,13 @@ void twitch_update_players() {
             pos = fpos + 1;
         }
     }
-    /*
+    
     for (int i = 0; i < 100; i++) {
         stringstream ss;
         ss << players.size();
         player_add("mur1_" + ss.str(), PT_HOPE, UINT_MAX);
     }
-    */
+    
 }
 
 int lines_read = 0;
@@ -79,7 +79,7 @@ void twitch_update_bits() {
         NULL);                    // no attr. template
 
     if (hFile == INVALID_HANDLE_VALUE) {
-        printf("Could not open bits.txt.");
+        printf("Could not open bits.txt.\n");
     } {
 
         string file_content = "";
@@ -119,7 +119,7 @@ void twitch_update_bits() {
                     bits_spent.emplace(name, 0);
                 }
                 if (type == "b") {
-                    printf("adding bandage money\n");
+                    //printf("adding bandage money\n");
                     bits_it = bits_bandage.find(name);
                     if (bits_it != bits_bandage.end()) {
                         bits_bandage[name] = bits_it->second + stoi(bits_);
@@ -127,7 +127,7 @@ void twitch_update_bits() {
                         bits_bandage.emplace(name, stoi(bits_));
                     }
                 } else if (type == "s") {
-                    printf("adding shield money\n");
+                    //printf("adding shield money\n");
                     bits_it = bits_shield.find(name);
                     if (bits_it != bits_shield.end()) {
                         bits_shield[name] = bits_it->second + stoi(bits_);
@@ -141,12 +141,4 @@ void twitch_update_bits() {
             pos = fpos + 1;
         }
     }
-
-    /*
-    for (int i = 0; i < 100; i++) {
-        stringstream ss;
-        ss << players.size();
-        player_add("mur1_" + ss.str(), PT_HOPE, UINT_MAX);
-    }
-    */
 }

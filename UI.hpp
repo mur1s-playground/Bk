@@ -58,6 +58,9 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw);
 void ui_set_active(string name);
 
 void ui_process_click(unsigned int x, unsigned int y);
+bool ui_process_scroll(struct bit_field* bf_rw, unsigned int x, unsigned int y, int z);
 void ui_process_keys(unsigned int sdl_keyval_enum, struct bit_field* bf_rw);
+
+void ui_value_as_config(struct bit_field* bf_rw, string ui_name, string element_name, int index, int value);
 
 #endif

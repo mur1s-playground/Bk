@@ -207,8 +207,8 @@ void IRCClient::Parse(std::string data)
                         }
 
                         size_t bits_pos = prefix.find("bits=");
-                        if (bits_pos != std::string::npos && prefix.length() > bits_pos+4) {
-                            std::string bits = prefix.substr(bits_pos + 4);
+                        if (bits_pos != std::string::npos && prefix.length() > bits_pos+5) {
+                            std::string bits = prefix.substr(bits_pos + 5);
                             size_t bits_end_pos = bits.find_first_of(';');
                             if (bits_end_pos != std::string::npos) {
                                 bits = bits.substr(0, bits_end_pos);
@@ -231,10 +231,10 @@ void IRCClient::Parse(std::string data)
                                     int nicklen_bytes = (nick.length() + 1 + bits.length() + 2);
                                     std::string linetoadd = nick + ":" + bits + ":";
                                     bool add = false;
-                                    if (msg == "!shield") {
+                                    if (msg.find("!shield") != std::string::npos) {
                                         linetoadd += "s\n";
                                         add = true;
-                                    } else if (msg == "!bandage") {
+                                    } else if (msg.find("!bandage") != std::string::npos) {
                                         linetoadd += "b\n";
                                         add = true;
                                     }

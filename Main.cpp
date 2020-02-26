@@ -12,6 +12,7 @@
 #include "Storm.hpp"
 #include "Entity.hpp"
 #include "TwitchIntegration.hpp"
+#include "KillFeed.hpp"
 
 
 #include "time.h"
@@ -62,7 +63,7 @@ void start_game() {
 	map<string, struct player>::iterator pl_it = players.begin();
 	int i = 0;
 	while (pl_it != players.end()) {
-	//for (int i = 0; i < players.size(); i++) {
+		//for (int i = 0; i < players.size(); i++) {
 		stringstream ss_p;
 		ss_p << i;
 
@@ -95,7 +96,7 @@ void start_game() {
 		//object itself
 		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, max_pos, entities.size() - 1);
 		//object text
-		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { cur_e->position[0] - 32.0f - 3, cur_e->position[1] - 32.0f - 3, cur_e->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { cur_e->name_len*32.0f+32.0f+3, 96.0f+3, 0 }, entities.size() - 1);
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { cur_e->position[0] - 32.0f - 3, cur_e->position[1] - 32.0f - 3, cur_e->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { cur_e->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, entities.size() - 1);
 		pl_it->second.entity_id = entities.size() - 1;
 
 		i++;
@@ -104,6 +105,10 @@ void start_game() {
 
 	bit_field_update_device(&bf_assets, 0);
 	players_upload(&bf_rw);
+
+	killfeed_init(&bf_rw);
+
+	ui_value_as_config(&bf_rw, "ingame_overlay", "killfeed", 0, kill_feed_pos);
 
 	//spawn weapons
 	for (int i = 0; i < players.size(); i++) {
@@ -315,17 +320,19 @@ int main(int argc, char** argv) {
 
 				float camera_delta_z = 0.0f;
 				if (sdl_event.type == SDL_MOUSEWHEEL) {
-					camera_delta_z -= sdl_event.wheel.y * sensitivity_z;
-					bool camera_z_has_moved = false;
-					float camera_z = camera[2];
-					camera_crop_tmp = camera_crop;
-					camera_move(struct vector3<float>(0.0f, 0.0f, camera_delta_z));
-					camera_get_crop(camera_crop);
-					if (camera_z != camera[2]) {
-						camera_move(struct vector3<float>(camera_crop_tmp[0] - camera_crop[0] + mouse_position[0] * (camera_z - camera[2]), 0.0f, 0.0f));
+					if (!ui_process_scroll(&bf_rw, mouse_position[0], mouse_position[1], sdl_event.wheel.y)) {
+						camera_delta_z -= sdl_event.wheel.y * sensitivity_z;
+						bool camera_z_has_moved = false;
+						float camera_z = camera[2];
+						camera_crop_tmp = camera_crop;
+						camera_move(struct vector3<float>(0.0f, 0.0f, camera_delta_z));
 						camera_get_crop(camera_crop);
-						camera_move(struct vector3<float>(0.0f, camera_crop_tmp[2] - camera_crop[2] + mouse_position[1] * (camera_z - camera[2]), 0.0f));
-						camera_get_crop(camera_crop);
+						if (camera_z != camera[2]) {
+							camera_move(struct vector3<float>(camera_crop_tmp[0] - camera_crop[0] + mouse_position[0] * (camera_z - camera[2]), 0.0f, 0.0f));
+							camera_get_crop(camera_crop);
+							camera_move(struct vector3<float>(0.0f, camera_crop_tmp[2] - camera_crop[2] + mouse_position[1] * (camera_z - camera[2]), 0.0f));
+							camera_get_crop(camera_crop);
+						}
 					}
 				}
 
@@ -606,6 +613,7 @@ int main(int argc, char** argv) {
 															if (players[etc->name].health <= 0) {
 																pl->kills++;
 																//printf(" & kill");
+																killfeed_add(&bf_rw, pl->name, players[etc->name].name);
 															}
 														}
 														//printf("\n");
@@ -755,6 +763,7 @@ int main(int argc, char** argv) {
 							}
 							if (pl->health <= 0) {
 								pl->alive = false;
+								killfeed_add(&bf_rw, NULL, pl->name, true);
 								//object itself
 								grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
 								//object text
