@@ -35,6 +35,8 @@ struct ui_element {
 	enum on_click_action_type		ocat;
 	string							ocap;
 
+	unsigned int					font_size;
+
 	char							value[51];
 };
 
@@ -63,4 +65,6 @@ void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsign
 
 void ui_value_as_config(struct bit_field* bf_rw, string ui_name, string element_name, int index, int value);
 
+void ui_textfield_set_int(struct bit_field* bf_rw, string ui_name, string ui_element_name, int value);
+void ui_textfield_set_value(struct bit_field* bf_rw, string ui_name, string ui_element_name, char value[50]);
 #endif

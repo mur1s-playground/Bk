@@ -52,16 +52,19 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                         }
                         name_len++;
                     }
-                    if (current_x >= uie->x1y1[0] && current_x < uie->x1y1[0]+32*name_len && current_y >= uie->x1y1[1] && current_y < uie->x1y1[1]+32) {
-                        int letter_idx = (current_x - uie->x1y1[0]) / 32;
-                        int letter_x = (current_x - uie->x1y1[0]) % 32;
+                    int fsize = uie->font_size;
+                    int fsize_fac = 32 / fsize;
+                    if (current_x >= uie->x1y1[0] && current_x < uie->x1y1[0]+fsize*name_len && current_x < uie->x2y2[0] && current_y >= uie->x1y1[1] && current_y < uie->x1y1[1]+fsize) {
+                        int letter_idx = (current_x - uie->x1y1[0]) / fsize;
+                        int letter_x = (current_x - uie->x1y1[0]) % fsize;
+                        int letter_y = (current_y - uie->x1y1[1]) % fsize;
                         if (uie->value[letter_idx] != '\0') {
                             unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)uie->value[letter_idx] - 48];
                             unsigned char* letter_frame = (unsigned char *)&bf_assets_data[letter_frame_pos];
-                            float alpha = letter_frame[(current_y - uie->x1y1[1]) * (32 * 4) + (letter_x) * 4 + 3];
+                            float alpha = letter_frame[(letter_y) * fsize_fac * (32 * 4) + (letter_x*fsize_fac) * 4 + 3];
                             if (alpha > 0) {
                                 for (int c = 0; c < channels - 1; c++) {
-                                    target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[(current_y - uie->x1y1[1]) * (32 * 4) + letter_x * 4 + c]);
+                                    target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[(letter_y) * fsize_fac * (32 * 4) + letter_x *fsize_fac* 4 + c]);
                                 }
                             }
                         }
@@ -230,6 +233,13 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
                             t.x2y2 = { (unsigned int)stoi(first), (unsigned int)stoi(second) };
                         }
                     }
+                    if (kv_pairs[i + 3].first == kv_pairs[i].second + "_fsize") {
+                        string first = kv_pairs[i + 3].second;
+                        first = trim(first);
+                        t.font_size = stoi(first);
+                    } else {
+                        t.font_size = 32;
+                    }
                     printf("adding textfield %s\n", t.name.c_str());
                     u.ui_elements.push_back(t);
                 }
@@ -325,6 +335,11 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
                         first = trim(first);
                         config[4] = stoi(first);
                     }
+                    if (kv_pairs[i + 6].first == kv_pairs[i].second + "_sgroup") {
+                        string first = kv_pairs[i + 6].second;
+                        first = trim(first);
+                        config[6] = stoi(first);
+                    }
                     config[5] = 0;
                     printf("adding scrolllist %s %i %i\n", t.name.c_str(), config[1], config[2]);
                     u.ui_elements.push_back(t);
@@ -378,12 +393,16 @@ void ui_process_click(unsigned int x, unsigned int y) {
 
 bool ui_process_scroll(struct bit_field *bf_rw, unsigned int x, unsigned int y, int z) {
     vector<struct ui_element> active_elements = uis[ui_active].ui_elements;
+    int sgroup = 0;
+    int fid = -1;
     for (int i = 0; i < active_elements.size(); i++) {
         if (x >= active_elements[i].x1y1[0] && x <= active_elements[i].x2y2[0] &&
             y >= active_elements[i].x1y1[1] && y <= active_elements[i].x2y2[1]) {
             
             if (active_elements[i].uet == UET_SCROLLLIST) {
+                fid = i;
                 int* config = (int*)&active_elements[i].value[0];
+                sgroup = config[6];
                 if (z < 0) {
                     if (config[5] < config[1] - 1) {
                         config[5]++;
@@ -395,9 +414,33 @@ bool ui_process_scroll(struct bit_field *bf_rw, unsigned int x, unsigned int y, 
                         ui_value_as_config(bf_rw, ui_active, active_elements[i].name, 5, config[5]);
                     }
                 }
-                return true;
+                if (sgroup == 0) return true;
             }
         }
+    }
+    if (sgroup > 0) {
+        for (int i = 0; i < active_elements.size(); i++) {
+            if (i != fid) {
+                if (active_elements[i].uet == UET_SCROLLLIST) {
+                    int* config = (int*)&active_elements[i].value[0];
+                    int cur_sgroup = config[6];
+                    if (cur_sgroup == sgroup) {
+                        if (z < 0) {
+                            if (config[5] < config[1] - 1) {
+                                config[5]++;
+                                ui_value_as_config(bf_rw, ui_active, active_elements[i].name, 5, config[5]);
+                            }
+                        } else {
+                            if (config[5] > 0) {
+                                config[5]--;
+                                ui_value_as_config(bf_rw, ui_active, active_elements[i].name, 5, config[5]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return true;
     }
     return false;
 }
@@ -482,11 +525,17 @@ void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsign
     }
     if (ui_active != "") {
         vector<struct ui_element> active_elements = uis[ui_active].ui_elements;
+
+        int sgroup = 0;
+        int fid = -1;
+
         for (int i = 0; i < active_elements.size(); i++) {
             if (x >= active_elements[i].x1y1[0] && x <= active_elements[i].x2y2[0] &&
                 y >= active_elements[i].x1y1[1] && y <= active_elements[i].x2y2[1]) {
                 if (active_elements[i].uet == UET_SCROLLLIST) {
+                    fid = i;
                     int* config = (int*)&active_elements[i].value[0];
+                    sgroup = config[6];
                     if (sdl_keyval_enum == SDLK_PAGEDOWN){
                         config[5] += 10;
                         if (config[5] >= config[1] - 1) config[5] = config[1] - 1;                        
@@ -496,7 +545,29 @@ void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsign
                         if (config[5] < 0) config[5] = 0;
                         ui_value_as_config(bf_rw, ui_active, active_elements[i].name, 5, config[5]);
                     }
-                    return;
+                    if (sgroup == 0) return;
+                }
+            }
+        }
+        if (sgroup > 0) {
+            for (int i = 0; i < active_elements.size(); i++) {
+                if (i != fid) {
+                    if (active_elements[i].uet == UET_SCROLLLIST) {
+                        int* config = (int*)&active_elements[i].value[0];
+                        int cur_sgroup = config[6];
+                        if (cur_sgroup == sgroup) {
+                            if (sdl_keyval_enum == SDLK_PAGEDOWN) {
+                                config[5] += 10;
+                                if (config[5] >= config[1] - 1) config[5] = config[1] - 1;
+                                ui_value_as_config(bf_rw, ui_active, active_elements[i].name, 5, config[5]);
+                            }
+                            else if (sdl_keyval_enum == SDLK_PAGEUP) {
+                                config[5] -= 10;
+                                if (config[5] < 0) config[5] = 0;
+                                ui_value_as_config(bf_rw, ui_active, active_elements[i].name, 5, config[5]);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -520,4 +591,51 @@ void ui_value_as_config(struct bit_field *bf_rw, string ui_name, string element_
     int ui_size = uis[ui_name].ui_elements.size() * sizeof(struct ui_element);
     unsigned int ui_size_in_bf = (unsigned int)ceilf(ui_size / (float)sizeof(unsigned int));
     bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_name], ui_size_in_bf);
+}
+
+void ui_textfield_set_int(struct bit_field *bf_rw, string ui_name, string ui_element_name, int value) {
+    struct ui_element* uies = (struct ui_element*) &bf_rw->data[ui_elements_position[ui_name]];
+    int uc;
+    for (uc = 0; uc < uis[ui_name].ui_elements.size(); uc++) {
+        if (uis[ui_name].ui_elements[uc].name == ui_element_name) {
+            struct ui_element* uie = &uies[uc];
+            stringstream ss_val;
+            ss_val << value;
+            int ca;
+            for (ca = 0; ca < ss_val.str().length(); ca++) {
+                uie->value[ca] = ss_val.str().at(ca);
+            }
+            for (; ca < 50; ca++) {
+                if (uie->value[ca] == '\0') break;
+                uie->value[ca] = '\0';
+            }
+            break;
+        }
+    }
+    int size = sizeof(struct ui_element);
+    unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
+    bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_name] + uc * size_in_bf, size_in_bf);
+}
+
+void ui_textfield_set_value(struct bit_field* bf_rw, string ui_name, string ui_element_name, char value[50]) {
+    struct ui_element* uies = (struct ui_element*) & bf_rw->data[ui_elements_position[ui_name]];
+    int uc;
+    for (uc = 0; uc < uis[ui_name].ui_elements.size(); uc++) {
+        if (uis[ui_name].ui_elements[uc].name == ui_element_name) {
+            struct ui_element* uie = &uies[uc];
+            int ca;
+            for (ca = 0; ca < 50; ca++) {
+                if (value[ca] == '\0') break;
+                uie->value[ca] = value[ca];
+            }
+            for (; ca < 50; ca++) {
+                if (uie->value[ca] == '\0') break;
+                uie->value[ca] = '\0';
+            }
+            break;
+        }
+    }
+    int size = sizeof(struct ui_element);
+    unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
+    bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_name] + uc * size_in_bf, size_in_bf);
 }

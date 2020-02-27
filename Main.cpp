@@ -14,6 +14,7 @@
 #include "TwitchIntegration.hpp"
 #include "KillFeed.hpp"
 #include "Playerlist.hpp"
+#include "Leaderboard.hpp"
 
 
 #include "time.h"
@@ -54,6 +55,9 @@ unsigned int tick_counter = 0;
 bool game_started = false;
 bool irc_started = false;
 bool running = true;
+
+int top_kills = 0;
+int top_damage = 0;
 
 void start_game() {
 	printf("starting game\n");
@@ -110,6 +114,8 @@ void start_game() {
 	killfeed_init(&bf_rw);
 
 	ui_value_as_config(&bf_rw, "ingame_overlay", "killfeed", 0, kill_feed_pos);
+
+	leaderboard_init(&bf_rw);
 
 	//spawn weapons
 	for (int i = 0; i < players.size(); i++) {
@@ -619,6 +625,7 @@ int main(int argc, char** argv) {
 																pl->kills++;
 																//printf(" & kill");
 																killfeed_add(&bf_rw, pl->name, players[etc->name].name);
+																leaderboard_add(&bf_rw, players[etc->name].name, players[etc->name].damage_dealt, players[etc->name].kills, pl->name);
 															}
 														}
 														//printf("\n");
@@ -732,6 +739,16 @@ int main(int argc, char** argv) {
 			players_it = players.begin();
 			while (players_it != players.end()) {
 				struct player* pl = &players_it->second;
+				if (pl->kills > top_kills) {
+					ui_textfield_set_value(&bf_rw, "ingame_menu", "top_kills", pl->name);
+					ui_textfield_set_int(&bf_rw, "ingame_menu", "top_kills_nr", pl->kills);
+					top_kills = pl->kills;
+				}
+				if (pl->damage_dealt > top_damage) {
+					ui_textfield_set_value(&bf_rw, "ingame_menu", "top_damage", pl->name);
+					ui_textfield_set_int(&bf_rw, "ingame_menu", "top_damage_nr", pl->damage_dealt);
+					top_damage = pl->damage_dealt;
+				}
 				if (pl->alive) {
 					if (pl->health <= 0) {
 						struct entity* en = &es[pl->entity_id];
@@ -757,6 +774,15 @@ int main(int argc, char** argv) {
 					//for (int i = 0; i < players.size(); i++) {
 					struct player* pl = &players_it->second;
 					if (pl->alive) {
+						if (kill_count == players.size() - 1) {
+							ui_textfield_set_value(&bf_rw, "ingame_menu", "top_placement", pl->name);
+							char tmp[2];
+							tmp[0] = '^';
+							tmp[1] = '\0';
+							leaderboard_add(&bf_rw, pl->name, pl->damage_dealt, pl->kills, tmp);
+							pl->alive = false;
+							ui_set_active("ingame_menu");
+						}
 						if (pl->damage_dealt > 0) {
 							//printf("name: %s, health: %d, shield: %d, damage: %d, kills: %d\n", pl->name, pl->health, pl->shield, pl->damage_dealt, pl->kills);
 						}
@@ -769,6 +795,10 @@ int main(int argc, char** argv) {
 							if (pl->health <= 0) {
 								pl->alive = false;
 								killfeed_add(&bf_rw, NULL, pl->name, true);
+								char tmp[2];
+								tmp[0] = ';';
+								tmp[1] = '\0';
+								leaderboard_add(&bf_rw, pl->name, pl->damage_dealt, pl->kills, tmp);
 								//object itself
 								grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
 								//object text
@@ -782,25 +812,7 @@ int main(int argc, char** argv) {
 			} else {
 				if (ui_active == "lobby" && irc_started) {
 					twitch_update_players(&bf_rw);
-
-					struct ui_element* uies = (struct ui_element*) &bf_rw.data[ui_elements_position["lobby"]];
-					int uc;
-					for (uc = 0; uc < uis["lobby"].ui_elements.size(); uc++) {
-						if (uis["lobby"].ui_elements[uc].name == "playercount") {
-							struct ui_element* uie = &uies[uc];
-							stringstream ss_pc;
-							ss_pc << players.size();
-							for (int ca = 0; ca < ss_pc.str().length(); ca++) {
-								uie->value[ca] = ss_pc.str().at(ca);
-							}
-							break;
-						}
-					}
-					int size = sizeof(struct ui_element);
-					unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
-					bit_field_invalidate_bulk(&bf_rw, ui_elements_position["lobby"] + uc * size_in_bf, size_in_bf);
-
-					printf("player_count %i\n", players.size());
+					ui_textfield_set_int(&bf_rw, "lobby", "playercount", players.size());
 				}
 				if (ui_active == "lobby" && !irc_started) {
 					string twitch_name = "";

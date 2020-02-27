@@ -7,7 +7,7 @@ int playerlist_pos;
 struct playerlist_element* playerlist;
 
 void playerlist_init(struct bit_field* bf_rw) {
-	int size = players.size() * sizeof(struct playerlist_element);
+	int size = players_max * sizeof(struct playerlist_element);
 	int size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
 
 	playerlist_pos = bit_field_add_bulk_zero(bf_rw, size_in_bf) + 1;
@@ -19,7 +19,7 @@ void playerlist_add(struct bit_field* bf_rw, const char playername[50]) {
 
 	memcpy(&pe[playerlist_count], &pes, sizeof(struct playerlist_element));
 
-	int size = players.size() * sizeof(struct playerlist_element);
+	int size = players_max * sizeof(struct playerlist_element);
 	int size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
 
 	bit_field_invalidate_bulk(bf_rw, playerlist_pos, size_in_bf);
