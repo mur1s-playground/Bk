@@ -13,6 +13,7 @@
 #include "Entity.hpp"
 #include "TwitchIntegration.hpp"
 #include "KillFeed.hpp"
+#include "Playerlist.hpp"
 
 
 #include "time.h"
@@ -342,10 +343,14 @@ int main(int argc, char** argv) {
 					camera_move(struct vector3<float>(-sdl_event.motion.xrel * zoom_sensitivity, -sdl_event.motion.yrel * zoom_sensitivity, 0.0f));
 					camera_get_crop(camera_crop);
 				}
+			} else {
+				if (sdl_event.type == SDL_MOUSEWHEEL) {
+					ui_process_scroll(&bf_rw, mouse_position[0], mouse_position[1], sdl_event.wheel.y);
+				}
 			}
 
 			if (sdl_event.type == SDL_KEYDOWN) {
-				ui_process_keys(sdl_event.key.keysym.sym, &bf_rw);
+				ui_process_keys(&bf_rw, mouse_position[0], mouse_position[1], sdl_event.key.keysym.sym);
 			}
 
 			if (sdl_event.type == SDL_MOUSEMOTION) {
@@ -392,7 +397,7 @@ int main(int argc, char** argv) {
 				bit_field_invalidate_bulk(&bf_output, output_position, output_size_in_bf);
 				bit_field_update_device(&bf_output, 0);
 			}
-			launch_draw_ui_kernel(bf_assets.device_data[0], u.background_position, ui_fonts_position, bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, bf_rw.device_data[0]);
+			launch_draw_ui_kernel(bf_assets.device_data[0], u.background_position, ui_fonts_position, bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, bf_rw.device_data[0], tick_counter);
 		}
 
 		bit_field_update_host(&bf_output, 0);
@@ -776,7 +781,25 @@ int main(int argc, char** argv) {
 				}
 			} else {
 				if (ui_active == "lobby" && irc_started) {
-					twitch_update_players();
+					twitch_update_players(&bf_rw);
+
+					struct ui_element* uies = (struct ui_element*) &bf_rw.data[ui_elements_position["lobby"]];
+					int uc;
+					for (uc = 0; uc < uis["lobby"].ui_elements.size(); uc++) {
+						if (uis["lobby"].ui_elements[uc].name == "playercount") {
+							struct ui_element* uie = &uies[uc];
+							stringstream ss_pc;
+							ss_pc << players.size();
+							for (int ca = 0; ca < ss_pc.str().length(); ca++) {
+								uie->value[ca] = ss_pc.str().at(ca);
+							}
+							break;
+						}
+					}
+					int size = sizeof(struct ui_element);
+					unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
+					bit_field_invalidate_bulk(&bf_rw, ui_elements_position["lobby"] + uc * size_in_bf, size_in_bf);
+
 					printf("player_count %i\n", players.size());
 				}
 				if (ui_active == "lobby" && !irc_started) {
@@ -816,8 +839,22 @@ int main(int argc, char** argv) {
 							}
 							max_bits_per_game = stoi(bits_);
 						}
+						if (uis["settings"].ui_elements[uc].name == "max_players") {
+							string max_players_ = "";
+							for (int ca = 0; ca < 50; ca++) {
+								if (uis["settings"].ui_elements[uc].value[ca] != '\0') {
+									max_players_ += uis["settings"].ui_elements[uc].value[ca];
+								}
+							}
+							players_max = stoi(max_players_);
+							printf("setting max_players to %i\n", players_max);
+						}
 					}
 					if (twitch_name != "") {
+						playerlist_init(&bf_rw);
+
+						ui_value_as_config(&bf_rw, "lobby", "players", 0, playerlist_pos);
+
 						stringstream ss;
 						ss << rand();
 						string cache_dir = "cache\\" + ss.str();

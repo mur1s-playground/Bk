@@ -52,14 +52,14 @@ extern map<string, struct ui>  uis;
 extern map<string,unsigned int> ui_elements_position;
 extern unsigned int				ui_fonts_position;
 
-void launch_draw_ui_kernel(const unsigned int* bf_assets_data, const unsigned int background_position, const unsigned int font_position, unsigned int* bf_output_data, const unsigned int output_position, const unsigned int width, const unsigned int height, const unsigned int channels, const unsigned int* bf_rw_data);
+void launch_draw_ui_kernel(const unsigned int* bf_assets_data, const unsigned int background_position, const unsigned int font_position, unsigned int* bf_output_data, const unsigned int output_position, const unsigned int width, const unsigned int height, const unsigned int channels, const unsigned int* bf_rw_data, const unsigned int tick_counter);
 
 void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw);
 void ui_set_active(string name);
 
 void ui_process_click(unsigned int x, unsigned int y);
 bool ui_process_scroll(struct bit_field* bf_rw, unsigned int x, unsigned int y, int z);
-void ui_process_keys(unsigned int sdl_keyval_enum, struct bit_field* bf_rw);
+void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsigned int y, const unsigned int sdl_keyval_enum);
 
 void ui_value_as_config(struct bit_field* bf_rw, string ui_name, string element_name, int index, int value);
 

@@ -5,6 +5,7 @@
 #include <vector>
 #include "Util.hpp"
 #include "Player.hpp"
+#include "Playerlist.hpp"
 #include <sstream>
 
 string cache_dir = "";
@@ -21,7 +22,7 @@ void twitch_terminate_irc() {
     TerminateProcess((HANDLE)irc_process, exit_code);
 }
 
-void twitch_update_players() {
+void twitch_update_players(struct bit_field *bf_rw) {
     string file_path = cache_dir + "\\players.txt";
     HANDLE hFile = CreateFile(TEXT(file_path.c_str()), // open One.txt
         GENERIC_READ,             // open for reading
@@ -53,7 +54,10 @@ void twitch_update_players() {
         while ((fpos = file_content.find('\n', pos)) != string::npos) {
             string name = file_content.substr(pos, fpos - pos);
             name = trim(name);
-            player_add(name, PT_HOPE, UINT_MAX);
+            if (players.size() < players_max) {
+                player_add(name, PT_HOPE, UINT_MAX);
+                playerlist_add(bf_rw, name.c_str());
+            }
             pos = fpos + 1;
         }
     }
@@ -61,7 +65,12 @@ void twitch_update_players() {
     for (int i = 0; i < 100; i++) {
         stringstream ss;
         ss << players.size();
-        player_add("mur1_" + ss.str(), PT_HOPE, UINT_MAX);
+        string nnnn = "mur1_" + ss.str();
+        if (i % 2 == 0) nnnn += "__________________";
+        if (players.size() < players_max) {
+            player_add(nnnn, PT_HOPE, UINT_MAX);
+            playerlist_add(bf_rw, nnnn.c_str());
+        }
     }
     
 }

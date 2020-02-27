@@ -22,7 +22,7 @@ int                         ui_active_id = -1;
 map<string, unsigned int>   ui_elements_position;
 extern unsigned int			ui_fonts_position = 0;
 
-__global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigned int background_position, const unsigned int fonts_position, unsigned int* bf_output_data, const unsigned int output_position, const unsigned int width, const unsigned int height, const unsigned int channels, const unsigned int *bf_rw_data, const unsigned int ui_elements_position, const unsigned int kill_feed_position, const unsigned int kill_count) {
+__global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigned int background_position, const unsigned int fonts_position, unsigned int* bf_output_data, const unsigned int output_position, const unsigned int width, const unsigned int height, const unsigned int channels, const unsigned int *bf_rw_data, const unsigned int ui_elements_position, const unsigned int tick_counter) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (i < width * height) {
@@ -61,7 +61,7 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                             float alpha = letter_frame[(current_y - uie->x1y1[1]) * (32 * 4) + (letter_x) * 4 + 3];
                             if (alpha > 0) {
                                 for (int c = 0; c < channels - 1; c++) {
-                                    target_frame[current_y * (width * channels) + current_x * channels + c] = letter_frame[(current_y - uie->x1y1[1]) * (32 * 4) + letter_x * 4 + c];
+                                    target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[(current_y - uie->x1y1[1]) * (32 * 4) + letter_x * 4 + c]);
                                 }
                             }
                         }
@@ -94,15 +94,34 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                             }
 
                             int letter_idx_max = (uie->x2y2[0] - uie->x1y1[0]) / 8;
-                            int letter_idx = (current_x - uie->x1y1[0]) / 8;
 
-                            int letter_x = (current_x - uie->x1y1[0]) % 8;
+                            int scroll_width = text_len - letter_idx_max;
+                            float scroll_shift;
+                            if (scroll_width > 0) {
+                                scroll_shift = fmod(tick_counter/30.0f, (float)scroll_width);
+                            } else {
+                                scroll_shift = 0;
+                            }
+
+                            int letter_idx = current_x;
+                            int letter_x = current_x;
+                            int letter_x_delta = 0;
+                            if (text_len > letter_idx_max || content_align == 0) {
+                                letter_x_delta = ((int)floorf((scroll_shift - (int)floorf(scroll_shift)) * 8.0f));
+                                letter_idx += (int)floorf(scroll_shift)*8 + letter_x_delta;
+                                letter_x += letter_x_delta;
+                                letter_idx = (letter_idx - uie->x1y1[0]) / 8;
+                                letter_x = (letter_x - uie->x1y1[0]) % 8;
+                            } else {
+                                letter_idx = letter_idx_max - (letter_idx - uie->x1y1[0]) / 8;
+                                letter_x = (letter_x - uie->x1y1[0]) % 8;
+                            }
+
                             int letter_y = (current_y - uie->x1y1[1]) % 10;
 
                             if (letter_y > 0 && letter_y < 9) {
-
-                                if (content_align == 0) {
-                                    if (letter_idx < text_len && letter_idx >= 0) {
+                                if (letter_idx < text_len && letter_idx >= 0) {
+                                    if (text_len > letter_idx_max || content_align == 0) {
                                         int letter_idx_cur = letter_idx;
                                         if (current_kfe[letter_idx] != '\0') {
                                             unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[letter_idx_cur] - 48];
@@ -110,26 +129,22 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                                             float alpha = letter_frame[((letter_y - 1) * 4) * (32 * 4) + (letter_x * 4) * 4 + 3];
                                             if (alpha > 0) {
                                                 for (int c = 0; c < channels - 1; c++) {
-                                                    target_frame[current_y * (width * channels) + current_x * channels + c] = letter_frame[((letter_y - 1) * 4) * (32 * 4) + (letter_x * 4) * 4 + c];
+                                                    target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[((letter_y - 1) * 4) * (32 * 4) + (letter_x * 4) * 4 + c]);
                                                 }
                                             }
                                         }
-                                    }
-                                } else if (content_align == 1) {
-                                    if (letter_idx >= letter_idx_max - text_len - 1 && letter_idx < letter_idx_max) {
-                                        int letter_idx_cur = letter_idx_max - letter_idx - 1;
-                                        if (letter_idx_cur >= 0) {
-                                            if (current_kfe[letter_idx_cur] != '\0') {
-                                                unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[text_len - 1 - letter_idx_cur] - 48];
+                                    } else {
+                                            if (current_kfe[letter_idx] != '\0') {
+                                                unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[text_len - 1 - letter_idx] - 48];
+                                                //unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[text_len - 1 - letter_idx_cur] - 48];
                                                 unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
                                                 float alpha = letter_frame[((letter_y - 1) * 4) * (32 * 4) + (letter_x * 4) * 4 + 3];
                                                 if (alpha > 0) {
                                                     for (int c = 0; c < channels - 1; c++) {
-                                                        target_frame[current_y * (width * channels) + current_x * channels + c] = letter_frame[((letter_y - 1) * 4) * (32 * 4) + (letter_x * 4) * 4 + c];
+                                                        target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[((letter_y - 1) * 4) * (32 * 4) + (letter_x * 4) * 4 + c]);
                                                     }
                                                 }
                                             }
-                                        }
                                     }
                                 }
                             }
@@ -141,7 +156,7 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
     }
 }
 
-void launch_draw_ui_kernel(const unsigned int *bf_assets_data, const unsigned int background_position, const unsigned int font_position, unsigned int *bf_output_data, const unsigned int output_position, const unsigned int width, const unsigned int height, const unsigned int channels, const unsigned int* bf_rw_data) {
+void launch_draw_ui_kernel(const unsigned int *bf_assets_data, const unsigned int background_position, const unsigned int font_position, unsigned int *bf_output_data, const unsigned int output_position, const unsigned int width, const unsigned int height, const unsigned int channels, const unsigned int* bf_rw_data, const unsigned int tick_counter) {
     cudaError_t err = cudaSuccess;
 
     int threadsPerBlock = 256;
@@ -151,7 +166,7 @@ void launch_draw_ui_kernel(const unsigned int *bf_assets_data, const unsigned in
         ui_element_position = ui_elements_position[ui_active];
     }
 
-    draw_ui_kernel<<<blocksPerGrid, threadsPerBlock>>>(bf_assets_data, background_position, font_position, bf_output_data, output_position, width, height, channels, bf_rw_data, ui_element_position, kill_feed_pos, kill_count);
+    draw_ui_kernel<<<blocksPerGrid, threadsPerBlock>>>(bf_assets_data, background_position, font_position, bf_output_data, output_position, width, height, channels, bf_rw_data, ui_element_position, tick_counter);
     err = cudaGetLastError();
 
     if (err != cudaSuccess) {
@@ -387,7 +402,7 @@ bool ui_process_scroll(struct bit_field *bf_rw, unsigned int x, unsigned int y, 
     return false;
 }
 
-void ui_process_keys(unsigned int sdl_keyval_enum, struct bit_field *bf_rw) {
+void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsigned int y, const unsigned int sdl_keyval_enum) {
     if (ui_active != "" && uis[ui_active].active_element_id >= 0) {
         if (uis[ui_active].ui_elements[uis[ui_active].active_element_id].uet == UET_TEXTFIELD) {
             //printf("textfield active with value %s\n", val.c_str());
@@ -461,7 +476,29 @@ void ui_process_keys(unsigned int sdl_keyval_enum, struct bit_field *bf_rw) {
             int size = sizeof(struct ui_element);
             unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
             bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_active] + uis[ui_active].active_element_id * size_in_bf, size_in_bf);
+            return;
             //printf("new value of textfield is %s\n", uis[ui_active].ui_elements[uis[ui_active].active_element_id].value);
+        }
+    }
+    if (ui_active != "") {
+        vector<struct ui_element> active_elements = uis[ui_active].ui_elements;
+        for (int i = 0; i < active_elements.size(); i++) {
+            if (x >= active_elements[i].x1y1[0] && x <= active_elements[i].x2y2[0] &&
+                y >= active_elements[i].x1y1[1] && y <= active_elements[i].x2y2[1]) {
+                if (active_elements[i].uet == UET_SCROLLLIST) {
+                    int* config = (int*)&active_elements[i].value[0];
+                    if (sdl_keyval_enum == SDLK_PAGEDOWN){
+                        config[5] += 10;
+                        if (config[5] >= config[1] - 1) config[5] = config[1] - 1;                        
+                        ui_value_as_config(bf_rw, ui_active, active_elements[i].name, 5, config[5]);
+                    } else if (sdl_keyval_enum == SDLK_PAGEUP) {
+                        config[5] -= 10;
+                        if (config[5] < 0) config[5] = 0;
+                        ui_value_as_config(bf_rw, ui_active, active_elements[i].name, 5, config[5]);
+                    }
+                    return;
+                }
+            }
         }
     }
 }

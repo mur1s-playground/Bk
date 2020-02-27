@@ -15,6 +15,8 @@ map<player_type, struct model>  player_models;
 unsigned int                    players_position;
 map<string, struct player>      players;
 
+unsigned int				    players_max = 0;
+
 void player_models_init(struct bit_field* bf_assets) {
     vector<string> model_cfgs = get_all_files_names_within_folder("./players", "*", "cfg");
     vector<struct model> pms, pms_sorted;

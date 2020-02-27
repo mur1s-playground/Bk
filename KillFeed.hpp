@@ -8,6 +8,7 @@
 struct kill_feed_element {
     kill_feed_element(char s[50], char v[50], bool storm) { 
         int cur_pos = 0;
+        value[cur_pos++] = '^';
         if (!storm) {
             for (int i = 0; i < 50; i++) {
                 if (s[i] == '\0') break;
@@ -26,11 +27,12 @@ struct kill_feed_element {
             value[cur_pos] = v[i];
             cur_pos++;
         }
-        for (int i = cur_pos; i < 103; i++) {
+        value[cur_pos++] = '^';
+        for (int i = cur_pos; i < 105; i++) {
             value[i] = '\0';
         }
     }
-    char value[103];
+    char value[105];
 };
 
 using namespace std;
