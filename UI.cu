@@ -183,7 +183,7 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
     asset_loader_load_folder(bf_assets, "./font/");
     asset_loader_load_folder(bf_assets, "./font/capital/");
     vector<unsigned int> font_pos;
-    for (int i = 48; i < 122; i++) {
+    for (int i = 48; i <= 122; i++) {
         if (i >= 65 && i <= 90) {
             stringstream ch;
             ch << (char)i + 31;

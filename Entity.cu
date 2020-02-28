@@ -268,7 +268,7 @@ __global__ void draw_entities_kernel(
                                             else if (params[1 + letter_idx * 2] == 52) {
                                                 letter_code += '`';
                                             }
-                                            if (letter_code >= 0 && letter_code < 122 - 48) {
+                                            if (letter_code >= 0 && letter_code <= 122 - 48) {
                                                 unsigned char* letter = (unsigned char*)&device_data_assets[device_data_assets[font_position + letter_code]];
                                                 int letter_x = (int)(offset_to_model_base_x + 32.0f + 19) % 32;
                                                 int letter_y = (int)offset_to_model_base_y % 32;
@@ -330,7 +330,7 @@ __global__ void draw_entities_kernel(
                                 if (offset_to_model_base_y < 0 && offset_to_model_base_y >= -32.0f && offset_to_model_base_x + 32.0f >= 0 && offset_to_model_base_x + 32.0f < entities[entity_id].name_len *32) {
                                     int letter_idx = (int)(offset_to_model_base_x + 32.0f) / 32;
                                     int letter_code = (int)entities[entity_id].name[letter_idx] - 48;
-                                    if (letter_code >= 0 && letter_code < 122 - 48) {
+                                    if (letter_code >= 0 && letter_code <= 122 - 48) {
                                         unsigned char* letter = (unsigned char*)&device_data_assets[device_data_assets[font_position + (int)entities[entity_id].name[letter_idx] - 48]];
                                         int letter_y = (int)offset_to_model_base_y + 32;
                                         int letter_x = ((int)offset_to_model_base_x + 32) % 32;
