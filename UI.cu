@@ -12,6 +12,8 @@
 #include "Grid.hpp"
 #include "Main.hpp"
 #include <sstream>
+#include <fstream>
+#include <iostream>
 
 using namespace std;
 
@@ -607,9 +609,11 @@ void ui_textfield_set_int(struct bit_field *bf_rw, string ui_name, string ui_ele
             int ca;
             for (ca = 0; ca < ss_val.str().length(); ca++) {
                 uie->value[ca] = ss_val.str().at(ca);
+                uis[ui_name].ui_elements[uc].value[ca] = ss_val.str().at(ca);
             }
             for (; ca < 50; ca++) {
                 if (uie->value[ca] == '\0') break;
+                uis[ui_name].ui_elements[uc].value[ca] = '\0';
                 uie->value[ca] = '\0';
             }
             break;
@@ -620,7 +624,7 @@ void ui_textfield_set_int(struct bit_field *bf_rw, string ui_name, string ui_ele
     bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_name] + uc * size_in_bf, size_in_bf);
 }
 
-void ui_textfield_set_value(struct bit_field* bf_rw, string ui_name, string ui_element_name, char value[50]) {
+void ui_textfield_set_value(struct bit_field* bf_rw, string ui_name, string ui_element_name, const char value[50]) {
     struct ui_element* uies = (struct ui_element*) & bf_rw->data[ui_elements_position[ui_name]];
     int uc;
     for (uc = 0; uc < uis[ui_name].ui_elements.size(); uc++) {
@@ -629,10 +633,12 @@ void ui_textfield_set_value(struct bit_field* bf_rw, string ui_name, string ui_e
             int ca;
             for (ca = 0; ca < 50; ca++) {
                 if (value[ca] == '\0') break;
+                uis[ui_name].ui_elements[uc].value[ca] = value[ca];
                 uie->value[ca] = value[ca];
             }
             for (; ca < 50; ca++) {
                 if (uie->value[ca] == '\0') break;
+                uis[ui_name].ui_elements[uc].value[ca] = '\0';
                 uie->value[ca] = '\0';
             }
             break;
@@ -641,4 +647,29 @@ void ui_textfield_set_value(struct bit_field* bf_rw, string ui_name, string ui_e
     int size = sizeof(struct ui_element);
     unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
     bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_name] + uc * size_in_bf, size_in_bf);
+}
+
+void ui_save_fields_to_file(struct bit_field *bf_rw, string ui_name, string ui_fields[], unsigned int field_count, string folder, string filename) {
+    string filepath = folder + "/" + filename;
+
+    struct ui_element* uies = (struct ui_element*) & bf_rw->data[ui_elements_position[ui_name]];
+
+    ofstream sfile;
+    sfile.open(filepath);
+    for (int i = 0; i < field_count; i++) {
+        for (int uc = 0; uc < uis[ui_name].ui_elements.size(); uc++) {
+            if (uis[ui_name].ui_elements[uc].name == ui_fields[i]) {
+                sfile << "ui\t:\t" << ui_name << std::endl;
+                sfile << ui_name << "_field\t:\t" << ui_fields[i] << std::endl;
+                sfile << ui_name << "_value\t:\t";
+                for (int ch = 0; ch < 50; ch++) {
+                    if (uis[ui_name].ui_elements[uc].value[ch] == '\0') break;
+                    sfile << uis[ui_name].ui_elements[uc].value[ch];
+                }
+                sfile << std::endl;
+                sfile << std::endl;
+            }
+        }
+    }
+    sfile.close();
 }

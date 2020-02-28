@@ -15,6 +15,7 @@
 #include "KillFeed.hpp"
 #include "Playerlist.hpp"
 #include "Leaderboard.hpp"
+#include "Util.hpp"
 
 
 #include "time.h"
@@ -254,6 +255,28 @@ int main(int argc, char** argv) {
 	ui_init(&bf_assets, &bf_rw);
 	ui_set_active("main_menu");
 
+	// -- LOAD SETTINGS -- //
+	vector<pair<string, string>> kv_pairs = get_cfg_key_value_pairs("./", "settings.cfg");
+	for (int i = 0; i < kv_pairs.size(); i++) {
+		if (kv_pairs[i].first == "ui") {
+			string ui_name = kv_pairs[i].second;
+			ui_name = trim(ui_name);
+			string ui_field = "";
+			string ui_value = "";
+			if (kv_pairs[i + 1].first == kv_pairs[i].second + "_field") {
+				ui_field = kv_pairs[i + 1].second;
+				ui_field = trim(ui_field);
+			}
+			if (kv_pairs[i + 2].first == kv_pairs[i].second + "_value") {
+				ui_value = kv_pairs[i + 2].second;
+				ui_value = trim(ui_value);
+			}
+			if (ui_field != "" && ui_value != "") {
+				printf("loading from cfg for %s field %s value %s\n", ui_name.c_str(), ui_field.c_str(), ui_value.c_str());
+				ui_textfield_set_value(&bf_rw, ui_name, ui_field, ui_value.c_str());
+			}
+		}
+	}
 
 	// -- MAPS -- //
 
@@ -702,12 +725,21 @@ int main(int argc, char** argv) {
 						if (target_orientation < 0) {
 							target_orientation += 360;
 						}
-						if (abs(en->orientation - target_orientation) > orientation_change_per_tick) {
-							if (en->orientation > target_orientation) {
-								en->orientation -= orientation_change_per_tick;
+						if (abs(((int)en->orientation - target_orientation) % 360) > orientation_change_per_tick) {
+							if (target_orientation > en->orientation) {
+								if (abs(en->orientation + 360 - target_orientation) < abs(target_orientation - en->orientation)) {
+									en->orientation -= orientation_change_per_tick;
+								} else {
+									en->orientation += orientation_change_per_tick;
+								}
 							} else {
-								en->orientation += orientation_change_per_tick;
+								if (abs(en->orientation - (target_orientation + 360)) < abs(en->orientation - target_orientation)) {
+									en->orientation += orientation_change_per_tick;
+								} else {
+									en->orientation -= orientation_change_per_tick;
+								}
 							}
+							if (en->orientation < 0) en->orientation += 360;
 						} else {
 							en->orientation = target_orientation;
 							//object itself
@@ -928,6 +960,9 @@ int main(int argc, char** argv) {
 
 		tick_counter++;
 	}
+
+	string s_fields[5] = { "twitch_name", "bits_bandage", "bits_shield", "bits_game", "max_players" };
+	ui_save_fields_to_file(&bf_rw, "settings", s_fields, 5, "./", "settings.cfg");
 
 	twitch_terminate_irc();
 

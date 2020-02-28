@@ -67,5 +67,8 @@ void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsign
 void ui_value_as_config(struct bit_field* bf_rw, string ui_name, string element_name, int index, int value);
 
 void ui_textfield_set_int(struct bit_field* bf_rw, string ui_name, string ui_element_name, int value);
-void ui_textfield_set_value(struct bit_field* bf_rw, string ui_name, string ui_element_name, char value[50]);
+void ui_textfield_set_value(struct bit_field* bf_rw, string ui_name, string ui_element_name, const char value[50]);
+
+void ui_save_fields_to_file(struct bit_field* bf_rw, string ui_name, string ui_fields[], unsigned int field_count, string folder, string filename);
+
 #endif
