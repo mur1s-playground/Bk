@@ -75,6 +75,15 @@ void start_game() {
 		entity_add(string(pl_it->second.name), ET_PLAYER, 0, 0);
 		struct entity* cur_e = &entities[entities.size() - 1];
 
+		cur_e->params[0] = (char)pl_it->second.health;
+		cur_e->params[1] = (char)pl_it->second.shield;
+		int* params = (int*)&cur_e->params;
+		int params_pos = 1;
+		for (int ip = 0; ip < 6; ip++) {
+			params[params_pos++] = pl_it->second.inventory->item_id;
+			params[params_pos++] = pl_it->second.inventory->item_param;
+		}
+
 		bool found_spawn = false;
 		float x = 0;
 		float y = 0;
@@ -102,6 +111,8 @@ void start_game() {
 		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, max_pos, entities.size() - 1);
 		//object text
 		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { cur_e->position[0] - 32.0f - 3, cur_e->position[1] - 32.0f - 3, cur_e->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { cur_e->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, entities.size() - 1);
+		//object inventory
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { cur_e->position[0] - 32.0f - 3, cur_e->position[1], cur_e->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, entities.size() - 1);
 		pl_it->second.entity_id = entities.size() - 1;
 
 		i++;
@@ -386,7 +397,7 @@ int main(int argc, char** argv) {
 			launch_draw_map(bf_assets.device_data[0], gm.map_zoom_level_count, gm.map_zoom_center_z, gm.map_zoom_level_offsets_position, gm.map_positions, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
 
 			launch_draw_entities_kernel(bf_assets.device_data[0], player_models_position, item_models_position, map_models_position, ui_fonts_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
-				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], tick_counter);
+				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], mouse_position, tick_counter);
 		
 			launch_draw_storm_kernel(bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[2], camera[2], storm_current, storm_to, 50, { 45, 0, 100 });
 
@@ -409,12 +420,6 @@ int main(int argc, char** argv) {
 		bit_field_update_host(&bf_output, 0);
 
 		sdl_update_frame((Uint32*)&bf_output.data[output_position]);
-
-		long tf_3 = clock();
-		long tf_ = tf_3 - tf;
-		sec += ((double)tf_ / CLOCKS_PER_SEC);
-		tf = clock();
-		fps++;
 
 		if (game_started) {
 			struct entity* es = (struct entity*) & bf_rw.data[entities_position];
@@ -709,6 +714,9 @@ int main(int argc, char** argv) {
 							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
 							//object text
 							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+							//object inventory
+							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, pl->entity_id);
+
 							en->force[0] = delta_x;
 							en->force[1] = delta_y;
 
@@ -731,6 +739,16 @@ int main(int argc, char** argv) {
 							grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
 							//object text
 							grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+							//object inventory
+							grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f*6, 0 }, pl->entity_id);
+						}
+						en->params[0] = (char)players_it->second.health;
+						en->params[1] = (char)players_it->second.shield;
+						int* params = (int*)&en->params;
+						int params_pos = 1;
+						for (int ip = 0; ip < 6; ip++) {
+							params[params_pos++] = players_it->second.inventory[ip].item_id;
+							params[params_pos++] = players_it->second.inventory[ip].item_param;
 						}
 					}
 				}
@@ -757,6 +775,8 @@ int main(int argc, char** argv) {
 						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
 						//object text
 						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+						//object inventory
+						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, pl->entity_id);
 						pl->entity_id = UINT_MAX;
 					}
 				}
@@ -764,7 +784,7 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		if (sec >= 1.0) {
+		if (tick_counter % 30 == 0) {
 			if (game_started) {
 				twitch_update_bits();
 				//struct player* players_ptr = (struct player*) &bf_rw.data[players_position];
@@ -783,9 +803,6 @@ int main(int argc, char** argv) {
 							pl->alive = false;
 							ui_set_active("ingame_menu");
 						}
-						if (pl->damage_dealt > 0) {
-							//printf("name: %s, health: %d, shield: %d, damage: %d, kills: %d\n", pl->name, pl->health, pl->shield, pl->damage_dealt, pl->kills);
-						}
 						if (pl->entity_id < UINT_MAX) {
 							//printf("%i ", pl->entity_id);
 							struct entity* en = &es[pl->entity_id];
@@ -803,6 +820,8 @@ int main(int argc, char** argv) {
 								grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
 								//object text
 								grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+								//object inventory
+								grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, pl->entity_id);
 								pl->entity_id = UINT_MAX;
 							}
 						}
@@ -875,14 +894,31 @@ int main(int argc, char** argv) {
 					}
 				}
 			}
-			
+		}
+
+		long tf_3 = clock();
+		long tf_ = tf_3 - tf;
+		sec += ((double)tf_ / CLOCKS_PER_SEC);
+		tf = clock();
+		fps++;
+
+		if (sec >= 1) {
 			printf("main fps: %d\r\n", fps);
-			printf("main ft: %f, main ft_l: %f\r\n", tf_ / (double)CLOCKS_PER_SEC, (tf_3 - tf_l) / (double)CLOCKS_PER_SEC);
-			if (fps > target_ticks_per_second+2) {
+			//printf("main ft: %f, main ft_l: %f\r\n", tf_ / (double)CLOCKS_PER_SEC, (tf_3 - tf_l) / (double)CLOCKS_PER_SEC);
+			double frame_time = (tf_3 - tf_l) / (double)CLOCKS_PER_SEC;
+			//printf("frame_time %f, target_frame_time %f\n", frame_time, 1000.0f / (float)target_ticks_per_second / 1000.0f);
+			//printf("going for: %f\n", floorf((1000.0f / (float)target_ticks_per_second / 1000.0f - frame_time) * 1000.0f));
+			if (frame_time < 1000.0f/(float)target_ticks_per_second / 1000.0f) {
+				frame_balancing = (int)floorf((1000.0f / (float)target_ticks_per_second / 1000.0f - frame_time)*1000.0f);
+			} else {
+				frame_balancing = 0;
+			}
+			//printf("frame_balancing %i\n", frame_balancing);
+			/*if (fps > target_ticks_per_second+2) {
 				frame_balancing++;
 			} else if (fps < target_ticks_per_second && frame_balancing > 0) {
 				frame_balancing--;
-			}
+			}*/
 			sec = 0;
 			fps = 0;
 		}

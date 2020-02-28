@@ -16,6 +16,7 @@ enum on_click_action_type {
 	BAT_GAMESTART,
 	BAT_QUIT,
 	BAT_SELECT,
+	BAT_GS
 };
 
 enum ui_element_type {

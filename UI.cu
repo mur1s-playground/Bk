@@ -274,6 +274,8 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
                             first = trim(first);
                             if (first == "UI") {
                                 b.ocat = BAT_UI;
+                            } else if (first == "GS") {
+                                b.ocat = BAT_GS;
                             }
                             string second = kv_pairs[i + 3].second.substr(sep + 1);
                             second = trim(second);
@@ -375,13 +377,14 @@ void ui_process_click(unsigned int x, unsigned int y) {
                 if (ocat == BAT_QUIT) {
                     running = false;
                     break;
-                }
-                else if (ocat == BAT_GAMESTART) {
+                } else if (ocat == BAT_GAMESTART) {
                     start_game();
                     break;
-                }
-                else if (ocat == BAT_UI) {
+                } else if (ocat == BAT_UI) {
                     ui_set_active(on_click_action_param);
+                    break;
+                } else if (ocat == BAT_GS) {
+                    target_ticks_per_second = stoi(on_click_action_param);
                     break;
                 }
             } else if (active_elements[i].uet == UET_TEXTFIELD) {
