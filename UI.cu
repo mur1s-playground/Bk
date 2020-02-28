@@ -543,7 +543,13 @@ void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsign
                     sgroup = config[6];
                     if (sdl_keyval_enum == SDLK_PAGEDOWN){
                         config[5] += 10;
-                        if (config[5] >= config[1] - 1) config[5] = config[1] - 1;                        
+                        if (config[5] >= config[1] - 1) {
+                            if (config[1] > 0) {
+                                config[5] = config[1] - 1;
+                            } else {
+                                config[5] = 0;
+                            }
+                        }
                         ui_value_as_config(bf_rw, ui_active, active_elements[i].name, 5, config[5]);
                     } else if (sdl_keyval_enum == SDLK_PAGEUP) {
                         config[5] -= 10;
@@ -563,7 +569,13 @@ void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsign
                         if (cur_sgroup == sgroup) {
                             if (sdl_keyval_enum == SDLK_PAGEDOWN) {
                                 config[5] += 10;
-                                if (config[5] >= config[1] - 1) config[5] = config[1] - 1;
+                                if (config[5] >= config[1] - 1) {
+                                    if (config[1] > 0) {
+                                        config[5] = config[1] - 1;
+                                    } else {
+                                        config[5] = 0;
+                                    }
+                                }
                                 ui_value_as_config(bf_rw, ui_active, active_elements[i].name, 5, config[5]);
                             }
                             else if (sdl_keyval_enum == SDLK_PAGEUP) {
