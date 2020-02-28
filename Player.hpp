@@ -56,7 +56,7 @@ extern unsigned int						players_position;
 extern unsigned int						players_max;
 
 void player_models_init(struct bit_field* bf_assets);
-void player_add(string name, enum player_type pt, unsigned int entity_id);
+void player_add(struct bit_field* bf_rw, string name, enum player_type pt, unsigned int entity_id);
 void player_type_change(string name, enum player_type pt);
 void players_upload(struct bit_field* bf);
 

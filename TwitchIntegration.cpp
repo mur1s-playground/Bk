@@ -55,13 +55,12 @@ void twitch_update_players(struct bit_field *bf_rw) {
             string name = file_content.substr(pos, fpos - pos);
             name = trim(name);
             if (players.size() < players_max) {
-                player_add(name, PT_HOPE, UINT_MAX);
-                playerlist_add(bf_rw, name.c_str());
+                player_add(bf_rw, name, PT_HOPE, UINT_MAX);
             }
             pos = fpos + 1;
         }
     }
-    
+    /*
     for (int i = 0; i < 100; i++) {
         stringstream ss;
         ss << players.size();
@@ -72,7 +71,7 @@ void twitch_update_players(struct bit_field *bf_rw) {
             playerlist_add(bf_rw, nnnn.c_str());
         }
     }
-    
+    */
 }
 
 int lines_read = 0;

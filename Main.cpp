@@ -130,7 +130,8 @@ void start_game() {
 	leaderboard_init(&bf_rw);
 
 	//spawn weapons
-	for (int i = 0; i < players.size(); i++) {
+	unsigned int weapon_count = max(100, players.size());
+	for (int i = 0; i < weapon_count; i++) {
 		stringstream ss_p;
 		ss_p << i;
 		entity_add("colt_" + ss_p.str(), ET_ITEM, 50, 0);
@@ -161,7 +162,8 @@ void start_game() {
 	}
 
 	//spawn shield
-	for (int i = 0; i < players.size()/2; i++) {
+	unsigned int shield_count = max(100, players.size());
+	for (int i = 0; i < shield_count; i++) {
 		stringstream ss_p;
 		ss_p << i;
 		entity_add("bottle_" + ss_p.str(), ET_ITEM, 51, 0);
@@ -192,7 +194,8 @@ void start_game() {
 	}
 
 	//spawn bandages
-	for (int i = 0; i < players.size() / 2; i++) {
+	unsigned int bandages_count = max(100, players.size());
+	for (int i = 0; i < bandages_count; i++) {
 		stringstream ss_p;
 		ss_p << i;
 		entity_add("bandage_" + ss_p.str(), ET_ITEM, 52, 0);
