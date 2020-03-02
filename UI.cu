@@ -9,6 +9,7 @@
 #include <utility>
 #include <SDL.h>
 #include "Entity.hpp"
+#include "Game.hpp"
 #include "Grid.hpp"
 #include "Main.hpp"
 #include <sstream>
@@ -22,7 +23,7 @@ map<string, struct ui>  uis;
 
 int                         ui_active_id = -1;
 map<string, unsigned int>   ui_elements_position;
-extern unsigned int			ui_fonts_position = 0;
+unsigned int		    	ui_fonts_position = 0;
 
 __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigned int background_position, const unsigned int fonts_position, unsigned int* bf_output_data, const unsigned int output_position, const unsigned int width, const unsigned int height, const unsigned int channels, const unsigned int *bf_rw_data, const unsigned int ui_elements_position, const unsigned int tick_counter) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -80,13 +81,15 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                         int content_line_length = config[2];
                         int content_order       = config[3];
                         int content_align       = config[4];
-                        int content_scroll_pos =  config[5];
+                        int content_scroll_pos  = config[5];
+                        //sgroup = config[6]
+                        int content_fsize       = config[7];
 
                         unsigned char* kfes = (unsigned char *)&bf_rw_data[content_position];
                         //int line_count = (bf_rw_data[content_position - 1] * sizeof(unsigned int)) / content_line_length;
 
-                        if (content_scroll_pos + (current_y - uie->x1y1[1]) / 10 < content_lines) {
-                            int current_line_y = content_scroll_pos + ((current_y - uie->x1y1[1]) / 10);
+                        if (content_scroll_pos + (current_y - uie->x1y1[1]) / (content_fsize+2) < content_lines) {
+                            int current_line_y = content_scroll_pos + ((current_y - uie->x1y1[1]) / (content_fsize+2));
                             if (content_order == 0) {
                                current_line_y = content_lines - 1 - current_line_y;
                             }
@@ -98,7 +101,7 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                                 text_len++;
                             }
 
-                            int letter_idx_max = (uie->x2y2[0] - uie->x1y1[0]) / 8;
+                            int letter_idx_max = (uie->x2y2[0] - uie->x1y1[0]) / content_fsize;
 
                             int scroll_width = text_len - letter_idx_max;
                             float scroll_shift;
@@ -112,29 +115,30 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                             int letter_x = current_x;
                             int letter_x_delta = 0;
                             if (text_len > letter_idx_max || content_align == 0) {
-                                letter_x_delta = ((int)floorf((scroll_shift - (int)floorf(scroll_shift)) * 8.0f));
-                                letter_idx += (int)floorf(scroll_shift)*8 + letter_x_delta;
+                                letter_x_delta = ((int)floorf((scroll_shift - (int)floorf(scroll_shift)) * (float)content_fsize));
+                                letter_idx += (int)floorf(scroll_shift)*content_fsize + letter_x_delta;
                                 letter_x += letter_x_delta;
-                                letter_idx = (letter_idx - uie->x1y1[0]) / 8;
-                                letter_x = (letter_x - uie->x1y1[0]) % 8;
+                                letter_idx = (letter_idx - uie->x1y1[0]) / content_fsize;
+                                letter_x = (letter_x - uie->x1y1[0]) % content_fsize;
                             } else {
-                                letter_idx = letter_idx_max - (letter_idx - uie->x1y1[0]) / 8;
-                                letter_x = (letter_x - uie->x1y1[0]) % 8;
+                                letter_idx = letter_idx_max - (letter_idx - uie->x1y1[0]) / content_fsize;
+                                letter_x = (letter_x - uie->x1y1[0]) % content_fsize;
                             }
 
-                            int letter_y = (current_y - uie->x1y1[1]) % 10;
+                            int letter_y = (current_y - uie->x1y1[1]) % (content_fsize+2);
 
-                            if (letter_y > 0 && letter_y < 9) {
+                            int fontsize_fac = 32 / content_fsize;
+                            if (letter_y > 0 && letter_y < content_fsize+1) {
                                 if (letter_idx < text_len && letter_idx >= 0) {
                                     if (text_len > letter_idx_max || content_align == 0) {
                                         int letter_idx_cur = letter_idx;
                                         if (current_kfe[letter_idx] != '\0') {
                                             unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[letter_idx_cur] - 48];
                                             unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
-                                            float alpha = letter_frame[((letter_y - 1) * 4) * (32 * 4) + (letter_x * 4) * 4 + 3];
+                                            float alpha = letter_frame[((letter_y - 1) * fontsize_fac) * (32 * 4) + (letter_x * fontsize_fac) * 4 + 3];
                                             if (alpha > 0) {
                                                 for (int c = 0; c < channels - 1; c++) {
-                                                    target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[((letter_y - 1) * 4) * (32 * 4) + (letter_x * 4) * 4 + c]);
+                                                    target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[((letter_y - 1) * fontsize_fac) * (32 * 4) + (letter_x * fontsize_fac) * 4 + c]);
                                                 }
                                             }
                                         }
@@ -143,10 +147,10 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                                                 unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[text_len - 1 - letter_idx] - 48];
                                                 //unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[text_len - 1 - letter_idx_cur] - 48];
                                                 unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
-                                                float alpha = letter_frame[((letter_y - 1) * 4) * (32 * 4) + (letter_x * 4) * 4 + 3];
+                                                float alpha = letter_frame[((letter_y - 1) * fontsize_fac) * (32 * 4) + (letter_x * fontsize_fac) * 4 + 3];
                                                 if (alpha > 0) {
                                                     for (int c = 0; c < channels - 1; c++) {
-                                                        target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[((letter_y - 1) * 4) * (32 * 4) + (letter_x * 4) * 4 + c]);
+                                                        target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[((letter_y - 1) * fontsize_fac) * (32 * 4) + (letter_x * fontsize_fac) * 4 + c]);
                                                     }
                                                 }
                                             }
@@ -289,6 +293,8 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
                                 b.ocat = BAT_QUIT;
                             } else if (first == "GAMESTART") {
                                 b.ocat = BAT_GAMESTART;
+                            } else if (first == "GAMEEND") {
+                                b.ocat = BAT_GAMEEND;
                             }
                         }
                     }
@@ -344,6 +350,11 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
                         first = trim(first);
                         config[6] = stoi(first);
                     }
+                    if (kv_pairs[i + 7].first == kv_pairs[i].second + "_fsize") {
+                        string first = kv_pairs[i + 7].second;
+                        first = trim(first);
+                        config[7] = stoi(first);
+                    }
                     config[5] = 0;
                     printf("adding scrolllist %s %i %i\n", t.name.c_str(), config[1], config[2]);
                     u.ui_elements.push_back(t);
@@ -366,7 +377,7 @@ void ui_set_active(string name) {
     uis[ui_active].active_element_id = -1;
 }
 
-void ui_process_click(unsigned int x, unsigned int y) {
+bool ui_process_click(struct bit_field *bf_rw, unsigned int x, unsigned int y) {
     vector<struct ui_element> active_elements = uis[ui_active].ui_elements;
     for (int i = 0; i < active_elements.size(); i++) {
         if (x >= active_elements[i].x1y1[0] && x <= active_elements[i].x2y2[0] &&
@@ -380,7 +391,10 @@ void ui_process_click(unsigned int x, unsigned int y) {
                     running = false;
                     break;
                 } else if (ocat == BAT_GAMESTART) {
-                    start_game();
+                    ui_set_active("loading");
+                    break;
+                } else if (ocat == BAT_GAMEEND) {
+                    game_destroy();
                     break;
                 } else if (ocat == BAT_UI) {
                     ui_set_active(on_click_action_param);
@@ -391,9 +405,28 @@ void ui_process_click(unsigned int x, unsigned int y) {
                 }
             } else if (active_elements[i].uet == UET_TEXTFIELD) {
 
+            } else if (active_elements[i].uet == UET_SCROLLLIST) {
+                struct ui_element* uies = (struct ui_element*) &bf_rw->data[ui_elements_position[ui_active]];
+                int* config = (int*)&uies[i].value[0];
+                int content_lines = config[1];
+                int content_order = config[3];
+                int content_scroll_pos = config[5];
+                int content_fsize = config[7];
+
+                if (content_scroll_pos + ((y - active_elements[i].x1y1[1]) / (content_fsize + 2)) < content_lines) {
+                    int current_line_y = content_scroll_pos + ((y - active_elements[i].x1y1[1]) / (content_fsize + 2));
+                    if (content_order == 0) {
+                        current_line_y = content_lines - 1 - current_line_y;
+                    }
+                    uis[ui_active].active_element_param = current_line_y;
+                } else {
+                    uis[ui_active].active_element_param = -1;
+                }
             }
+            return true;
         }
     }
+    return false;
 }
 
 bool ui_process_scroll(struct bit_field *bf_rw, unsigned int x, unsigned int y, int z) {
@@ -598,13 +631,15 @@ void ui_value_as_config(struct bit_field *bf_rw, string ui_name, string element_
             break;
         }
     }
+
     struct ui_element* uies = (struct ui_element*) &bf_rw->data[ui_elements_position[ui_name]];
     struct ui_element* uie = &uies[uc];
-    
-    int* config = (int*)&uis[ui_active].ui_elements[uc].value[0];
+
+    int* config = (int*)&uis[ui_name].ui_elements[uc].value[0];
     config[index] = value;
     int* pos_value = (int*)&uie->value[0];
     pos_value[index] = value;
+
     int ui_size = uis[ui_name].ui_elements.size() * sizeof(struct ui_element);
     unsigned int ui_size_in_bf = (unsigned int)ceilf(ui_size / (float)sizeof(unsigned int));
     bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_name], ui_size_in_bf);
@@ -634,6 +669,22 @@ void ui_textfield_set_int(struct bit_field *bf_rw, string ui_name, string ui_ele
     int size = sizeof(struct ui_element);
     unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
     bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_name] + uc * size_in_bf, size_in_bf);
+}
+
+string ui_textfield_get_value(struct bit_field* bf_rw, string ui_name, string ui_element_name) {
+    struct ui_element* uies = (struct ui_element*) & bf_rw->data[ui_elements_position[ui_name]];
+    int uc;
+    string val = "";
+    for (uc = 0; uc < uis[ui_name].ui_elements.size(); uc++) {
+        if (uis[ui_name].ui_elements[uc].name == ui_element_name) {
+            for (int i = 0; i < 52; i++) {
+                if (uis[ui_name].ui_elements[uc].value[i] == '\0') break;
+                val += uis[ui_name].ui_elements[uc].value[i];
+            }
+            break;
+        }
+    }
+    return val;
 }
 
 void ui_textfield_set_value(struct bit_field* bf_rw, string ui_name, string ui_element_name, const char value[50]) {

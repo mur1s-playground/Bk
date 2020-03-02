@@ -66,8 +66,7 @@ void launch_draw_storm_kernel(unsigned int* device_output_data, const unsigned i
 }
 
 void storm_init(struct bit_field* bf_map, struct bit_field* bf_rw) {
-	gm.map_storm_pathing = bit_field_add_bulk_zero(bf_rw, (unsigned int)ceilf(gm.map_dimensions[0]*gm.map_dimensions[1]*2)/(float)sizeof(unsigned int))+1;
-
+	printf("initialising storm\n");
 	storm_phase_start_ticks.emplace_back(5400);
 	storm_phase_duration_ticks.emplace_back(3600);
 	storm_phase_mapratio.emplace_back(0.75f);
@@ -107,6 +106,7 @@ void storm_init(struct bit_field* bf_map, struct bit_field* bf_rw) {
 		}
 	}
 	storm_to.radius = storm_radius;
+	printf("storm initialized\n");
 }
 
 void storm_next(struct bit_field* bf_map, struct bit_field* bf_rw) {

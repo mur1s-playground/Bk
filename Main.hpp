@@ -4,11 +4,15 @@
 #include "Vector2.hpp"
 #include "Vector3.hpp"
 #include <vector>
+
+#include "Grid.hpp"
 #include "Model.hpp"
 #include "Player.hpp"
 
+extern struct grid gd;
+
 extern struct bit_field bf_assets;
-extern struct bit_field bf_players;
+extern struct bit_field bf_rw;
 extern struct bit_field bf_output;
 
 extern struct vector3<float> camera;
@@ -22,7 +26,5 @@ extern bool running;
 extern map<string, int>				bits_spent;
 extern map<string, int>				bits_shield;
 extern map<string, int>				bits_bandage;
-
-void start_game();
 
 #endif

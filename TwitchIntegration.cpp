@@ -67,8 +67,8 @@ void twitch_update_players(struct bit_field *bf_rw) {
         string nnnn = "mur1_" + ss.str();
         if (i % 2 == 0) nnnn += "__________________";
         if (players.size() < players_max) {
-            player_add(nnnn, PT_HOPE, UINT_MAX);
-            playerlist_add(bf_rw, nnnn.c_str());
+            player_add(bf_rw, nnnn, PT_HOPE, UINT_MAX);
+            
         }
     }
     */

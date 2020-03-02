@@ -17,13 +17,14 @@
 #include "Grid.hpp"
 #include "Map.hpp"
 #include "Entity.hpp"
+#include "UI.hpp"
 
 struct game_map gm;
 
-vector<string> game_maps;
-
 unsigned int map_models_position;
 vector<struct model> map_models;
+
+unsigned int map_list_pos;
 
 __forceinline__
 __device__ float getInterpixel(const unsigned char* frame, const unsigned int width, const unsigned int height, const unsigned int channels, float x, float y, const int c) {
@@ -222,14 +223,38 @@ void launch_draw_map(const unsigned int* device_data, const unsigned int map_zoo
     }
 }
 
-void map_list_init() {
+void map_list_init(struct bit_field *bf_rw) {
     vector<string> maps_cfgs = get_all_files_names_within_folder("./maps", "*", "cfg");
+
+    int size = maps_cfgs.size() * sizeof(struct maplist_element);
+    int size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
+
+    map_list_pos = bit_field_add_bulk_zero(bf_rw, size_in_bf) + 1;
+
+    struct maplist_element* me = (struct maplist_element*) &bf_rw->data[map_list_pos];
+
+    int map_count = 0;
     for (int i = 0; i < maps_cfgs.size(); i++) {
         size_t pos = maps_cfgs[i].find_last_of(".");
         if (pos != string::npos) {
-            game_maps.push_back(maps_cfgs[i].substr(0, pos));
+            struct maplist_element mes(maps_cfgs[i].substr(0, pos).c_str());
+            memcpy(&me[map_count++], &mes, sizeof(struct maplist_element));
         }
     }
+
+    ui_value_as_config(bf_rw, "lobby", "maps", 0, map_list_pos);
+    ui_value_as_config(bf_rw, "lobby", "maps", 1, map_count);
+    bit_field_update_device(bf_rw, 0);
+}
+
+string map_name_from_index(struct bit_field *bf_rw, const unsigned int idx) {
+    struct maplist_element* me = (struct maplist_element*) &bf_rw->data[map_list_pos];
+    string name = "";
+    for (int i = 0; i < 52; i++) {
+        if (me[idx].value[i] == '\0') break;
+        name += me[idx].value[i];
+    }
+    return name;
 }
 
 void map_load(struct bit_field *bf_assets, string name) {

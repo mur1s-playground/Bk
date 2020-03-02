@@ -29,9 +29,6 @@ void sdl_show_window() {
 
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  // make the scaled rendering look smoother.
 	SDL_RenderSetLogicalSize(sdlRenderer, resolution[0], resolution[1]);
-
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  // make the scaled rendering look smoother.
-	SDL_RenderSetLogicalSize(sdlRenderer, resolution[0], resolution[1]);
 }
 
 void sdl_update_frame(Uint32 *pixels) {

@@ -14,6 +14,7 @@ enum on_click_action_type {
 	BAT_NONE,
 	BAT_UI,
 	BAT_GAMESTART,
+	BAT_GAMEEND,
 	BAT_QUIT,
 	BAT_SELECT,
 	BAT_GS
@@ -46,6 +47,7 @@ struct ui {
 	unsigned int				background_position;
 
 	int							active_element_id;
+	int							active_element_param;
 	vector<struct ui_element>	ui_elements;
 };
 
@@ -60,13 +62,15 @@ void launch_draw_ui_kernel(const unsigned int* bf_assets_data, const unsigned in
 void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw);
 void ui_set_active(string name);
 
-void ui_process_click(unsigned int x, unsigned int y);
+bool ui_process_click(struct bit_field* bf_rw, unsigned int x, unsigned int y);
 bool ui_process_scroll(struct bit_field* bf_rw, unsigned int x, unsigned int y, int z);
 void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsigned int y, const unsigned int sdl_keyval_enum);
 
 void ui_value_as_config(struct bit_field* bf_rw, string ui_name, string element_name, int index, int value);
 
 void ui_textfield_set_int(struct bit_field* bf_rw, string ui_name, string ui_element_name, int value);
+
+string ui_textfield_get_value(struct bit_field* bf_rw, string ui_name, string ui_element_name);
 void ui_textfield_set_value(struct bit_field* bf_rw, string ui_name, string ui_element_name, const char value[50]);
 
 void ui_save_fields_to_file(struct bit_field* bf_rw, string ui_name, string ui_fields[], unsigned int field_count, string folder, string filename);
