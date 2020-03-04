@@ -40,8 +40,6 @@ struct game_map {
 	unsigned int					map_storm_pathing;
 };
 
-
-
 extern struct game_map gm;
 
 using namespace std;

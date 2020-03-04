@@ -10,10 +10,33 @@
 
 string cache_dir = "";
 
+HANDLE players_handle;
+HANDLE bits_handle;
+
 intptr_t irc_process;
 
-void twitch_launch_irc(string cache_dir_, string twitch_name) {
-	cache_dir = cache_dir_;
+void twitch_launch_irc(string twitch_name) {
+    stringstream ss;
+    string cache_dir_;
+    do {
+        ss.clear();
+        ss << rand();
+        cache_dir_ = "cache\\" + ss.str();
+    } while (dir_exists(cache_dir_));
+    cache_dir = cache_dir_;
+    std::string command = "mkdir " + cache_dir;
+    system(command.c_str());
+
+    string players_fp = cache_dir + "\\players.txt";
+    HANDLE h = CreateFile(TEXT(players_fp.c_str()), GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    CloseHandle(h);
+    string bits_fp = cache_dir + "\\bits.txt";
+    h = CreateFile(TEXT(bits_fp.c_str()), GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    CloseHandle(h);
+	
+    players_handle = CreateFile(TEXT(players_fp.c_str()), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    bits_handle = CreateFile(TEXT(bits_fp.c_str()), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
 	irc_process = _spawnl(P_NOWAIT, "IRCClient.exe", "IRCClient.exe", "irc.chat.twitch.tv", "6667", "justinfan1337", cache_dir.c_str(), twitch_name.c_str(), NULL);
 }
 
@@ -22,43 +45,30 @@ void twitch_terminate_irc() {
     TerminateProcess((HANDLE)irc_process, exit_code);
 }
 
-void twitch_update_players(struct bit_field *bf_rw) {
-    string file_path = cache_dir + "\\players.txt";
-    HANDLE hFile = CreateFile(TEXT(file_path.c_str()), // open One.txt
-        GENERIC_READ,             // open for reading
-        FILE_SHARE_READ,                        // do not share
-        NULL,                     // no security
-        OPEN_EXISTING,            // existing file only
-        FILE_ATTRIBUTE_NORMAL,    // normal file
-        NULL);                    // no attr. template
+void twitch_update_players(struct bit_field* bf_rw) {
+    string file_content = "";
 
-    if (hFile == INVALID_HANDLE_VALUE) {
-        printf("Could not open players.txt.\n");
-    } {
-
-        string file_content = "";
-
-        DWORD  dwBytesRead, dwBytesWritten, dwPos;
-        BYTE   buff[4096];
-        while (ReadFile(hFile, buff, sizeof(buff), &dwBytesRead, NULL)
-            && dwBytesRead > 0) {
-            for (int i = 0; i < dwBytesRead; i++) {
-                file_content += buff[i];
-            }
+    DWORD  dwBytesRead, dwBytesWritten, dwPos;
+    BYTE   buff[4096];
+    long total_bytes_read = 0;
+    while (ReadFile(players_handle, buff, sizeof(buff), &dwBytesRead, NULL)
+        && dwBytesRead > 0) {
+        for (int i = 0; i < dwBytesRead; i++) {
+            file_content += buff[i];
+            total_bytes_read++;
         }
-
-        CloseHandle(hFile);
-
-        size_t pos = 0;
-        size_t fpos = 0;
-        while ((fpos = file_content.find('\n', pos)) != string::npos) {
-            string name = file_content.substr(pos, fpos - pos);
-            name = trim(name);
-            if (players.size() < players_max) {
-                player_add(bf_rw, name, PT_HOPE, UINT_MAX);
-            }
-            pos = fpos + 1;
+    }
+    SetFilePointer(players_handle, NULL, NULL, FILE_BEGIN);
+    
+    size_t pos = 0;
+    size_t fpos = 0;
+    while ((fpos = file_content.find('\n', pos)) != string::npos) {
+        string name = file_content.substr(pos, fpos - pos);
+        name = trim(name);
+        if (players.size() < players_max) {
+            player_add(bf_rw, name, PT_HOPE, UINT_MAX);
         }
+        pos = fpos + 1;
     }
     /*
     for (int i = 0; i < 100; i++) {
@@ -68,7 +78,7 @@ void twitch_update_players(struct bit_field *bf_rw) {
         if (i % 2 == 0) nnnn += "__________________";
         if (players.size() < players_max) {
             player_add(bf_rw, nnnn, PT_HOPE, UINT_MAX);
-            
+
         }
     }
     */
@@ -77,31 +87,17 @@ void twitch_update_players(struct bit_field *bf_rw) {
 int lines_read = 0;
 
 void twitch_update_bits() {
-    string file_path = cache_dir + "\\bits.txt";
-    HANDLE hFile = CreateFile(TEXT(file_path.c_str()), // open One.txt
-        GENERIC_READ,             // open for reading
-        FILE_SHARE_READ,                        // do not share
-        NULL,                     // no security
-        OPEN_EXISTING,            // existing file only
-        FILE_ATTRIBUTE_NORMAL,    // normal file
-        NULL);                    // no attr. template
-
-    if (hFile == INVALID_HANDLE_VALUE) {
-        printf("Could not open bits.txt.\n");
-    } {
-
         string file_content = "";
 
         DWORD  dwBytesRead, dwBytesWritten, dwPos;
         BYTE   buff[4096];
-        while (ReadFile(hFile, buff, sizeof(buff), &dwBytesRead, NULL)
+        while (ReadFile(bits_handle, buff, sizeof(buff), &dwBytesRead, NULL)
             && dwBytesRead > 0) {
             for (int i = 0; i < dwBytesRead; i++) {
                 file_content += buff[i];
             }
         }
-
-        CloseHandle(hFile);
+        SetFilePointer(bits_handle, NULL, NULL, FILE_BEGIN);
 
         size_t pos = 0;
         size_t fpos = 0;
@@ -148,5 +144,4 @@ void twitch_update_bits() {
             cur_lines++;
             pos = fpos + 1;
         }
-    }
 }

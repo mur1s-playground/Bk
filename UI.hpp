@@ -24,6 +24,7 @@ enum ui_element_type {
 	UET_TEXTFIELD,
 	UET_BUTTON,
 	UET_SCROLLLIST,
+	UET_IMAGE
 };
 
 struct ui_element {

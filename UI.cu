@@ -159,6 +159,38 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                             }
                         }
                     }          
+                } else if (uie->uet == UET_IMAGE) {
+                    if (current_x >= uie->x1y1[0] && current_x < uie->x2y2[0] && current_y >= uie->x1y1[1] && current_y < uie->x2y2[1]) {
+                        int* config = (int*)&uie->value[0];
+
+                        int image_position = config[0];
+
+                        if (image_position > 0) {
+                            int image_width = config[1];
+                            int image_height = config[2];
+
+                            int space_width = uie->x2y2[0] - uie->x1y1[0];
+                            int space_height = uie->x2y2[1] - uie->x1y1[1];
+                            float image_scale = 1.0f;
+                            if (image_width > space_width) {
+                                image_scale = space_width / (float)image_width;
+                            }
+                            if (image_height > space_height) {
+                                if (space_height / (float)image_height < image_scale) {
+                                    image_scale = space_height / (float)image_height;
+                                }
+                            }
+                            int image_source_x = (int)roundf((current_x - uie->x1y1[0])/image_scale);
+                            int image_source_y = (int)roundf((current_y - uie->x1y1[1])/image_scale);
+
+                            if (image_source_x < image_width && image_source_y < image_height) {
+                                unsigned char* src_frame = (unsigned char*)&bf_assets_data[image_position];
+                                for (int c = 0; c < channels - 1; c++) {
+                                    target_frame[current_y * (width * channels) + current_x * channels + c] = src_frame[image_source_y * (image_width * 4) + image_source_x * 4 + c];
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -357,6 +389,40 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
                     }
                     config[5] = 0;
                     printf("adding scrolllist %s %i %i\n", t.name.c_str(), config[1], config[2]);
+                    u.ui_elements.push_back(t);
+                }
+                if (kv_pairs[i].first == "image") {
+                    struct ui_element t;
+                    t.uet = UET_IMAGE;
+                    t.name = kv_pairs[i].second;
+                    for (int ch = 0; ch < 51; ch++) {
+                        t.value[ch] = '\0';
+                    }
+                    int* config = (int*)&t.value[0];
+                    if (kv_pairs[i + 1].first == kv_pairs[i].second + "_x1y1") {
+                        size_t sep = kv_pairs[i + 1].second.find(",");
+                        if (sep != string::npos) {
+                            string first = kv_pairs[i + 1].second.substr(0, sep);
+                            first = trim(first);
+                            string second = kv_pairs[i + 1].second.substr(sep + 1);
+                            second = trim(second);
+                            t.x1y1 = { (unsigned int)stoi(first), (unsigned int)stoi(second) };
+                        }
+                    }
+                    if (kv_pairs[i + 2].first == kv_pairs[i].second + "_x2y2") {
+                        size_t sep = kv_pairs[i + 2].second.find(",");
+                        if (sep != string::npos) {
+                            string first = kv_pairs[i + 2].second.substr(0, sep);
+                            first = trim(first);
+                            string second = kv_pairs[i + 2].second.substr(sep + 1);
+                            second = trim(second);
+                            t.x2y2 = { (unsigned int)stoi(first), (unsigned int)stoi(second) };
+                        }
+                    }
+                    config[0] = 0;
+                    config[1] = 0;
+                    config[2] = 0;
+                    printf("adding image %s\n", t.name.c_str());
                     u.ui_elements.push_back(t);
                 }
             }
@@ -632,17 +698,21 @@ void ui_value_as_config(struct bit_field *bf_rw, string ui_name, string element_
         }
     }
 
-    struct ui_element* uies = (struct ui_element*) &bf_rw->data[ui_elements_position[ui_name]];
-    struct ui_element* uie = &uies[uc];
+    if (uc < uis[ui_name].ui_elements.size()) {
+        struct ui_element* uies = (struct ui_element*) & bf_rw->data[ui_elements_position[ui_name]];
+        struct ui_element* uie = &uies[uc];
 
-    int* config = (int*)&uis[ui_name].ui_elements[uc].value[0];
-    config[index] = value;
-    int* pos_value = (int*)&uie->value[0];
-    pos_value[index] = value;
+        int* config = (int*)&uis[ui_name].ui_elements[uc].value[0];
+        config[index] = value;
+        int* pos_value = (int*)&uie->value[0];
+        pos_value[index] = value;
 
-    int ui_size = uis[ui_name].ui_elements.size() * sizeof(struct ui_element);
-    unsigned int ui_size_in_bf = (unsigned int)ceilf(ui_size / (float)sizeof(unsigned int));
-    bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_name], ui_size_in_bf);
+        int ui_size = uis[ui_name].ui_elements.size() * sizeof(struct ui_element);
+        unsigned int ui_size_in_bf = (unsigned int)ceilf(ui_size / (float)sizeof(unsigned int));
+        bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_name], ui_size_in_bf);
+    } else {
+        printf("trying to write cfg out of ui_elements bounds\n");
+    }
 }
 
 void ui_textfield_set_int(struct bit_field *bf_rw, string ui_name, string ui_element_name, int value) {

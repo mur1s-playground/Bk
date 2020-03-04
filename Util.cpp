@@ -59,3 +59,14 @@ vector<pair<string, string>> get_cfg_key_value_pairs(string folder, string filen
     }
     return result;
 }
+
+bool dir_exists(const string& dir_in) {
+    DWORD ftyp = GetFileAttributesA(dir_in.c_str());
+    if (ftyp == INVALID_FILE_ATTRIBUTES)
+        return false;
+
+    if (ftyp & FILE_ATTRIBUTE_DIRECTORY)
+        return true;
+
+    return false;
+}

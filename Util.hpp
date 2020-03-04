@@ -13,4 +13,6 @@ vector<string> get_all_files_names_within_folder(string folder, string wildcard,
 
 vector<pair<string, string>> get_cfg_key_value_pairs(string folder, string filename);
 
+bool dir_exists(const string& dir_in);
+
 #endif

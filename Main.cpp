@@ -216,7 +216,12 @@ int main(int argc, char** argv) {
 							string ui_element_name = uis[ui_active].ui_elements[uis[ui_active].active_element_id].name;
 							if (ui_active == "lobby" && ui_element_name == "maps") {
 								if (uis[ui_active].active_element_param > -1) {
-									ui_textfield_set_value(&bf_rw, "lobby", "selected_map", map_name_from_index(&bf_rw, uis[ui_active].active_element_param).c_str());
+									string map_name = map_name_from_index(&bf_rw, uis[ui_active].active_element_param);
+									ui_textfield_set_value(&bf_rw, "lobby", "selected_map", map_name.c_str());
+									string map_asset_path = "./maps/" + map_name + "/" + map_name + "_minimap.png";
+									ui_value_as_config(&bf_rw, "lobby", "minimap", 0, assets[map_asset_path]);
+									ui_value_as_config(&bf_rw, "lobby", "minimap", 1, assets_dimensions[map_asset_path].width);
+									ui_value_as_config(&bf_rw, "lobby", "minimap", 2, assets_dimensions[map_asset_path].height);
 								}
 							}
 						}
@@ -691,13 +696,16 @@ int main(int argc, char** argv) {
 					if (twitch_name != "") {
 						playerlist_init(&bf_rw);
 
-						ui_textfield_set_value(&bf_rw, "lobby", "selected_map", map_name_from_index(&bf_rw, 0).c_str());
+						string map_name = map_name_from_index(&bf_rw, 0);
+						ui_textfield_set_value(&bf_rw, "lobby", "selected_map", map_name.c_str());
+						string map_asset_path = "./maps/" + map_name + "/" + map_name + "_minimap.png";
+						ui_value_as_config(&bf_rw, "lobby", "minimap", 0, assets[map_asset_path]);
+						ui_value_as_config(&bf_rw, "lobby", "minimap", 1, assets_dimensions[map_asset_path].width);
+						ui_value_as_config(&bf_rw, "lobby", "minimap", 2, assets_dimensions[map_asset_path].height);
+
 						ui_value_as_config(&bf_rw, "lobby", "players", 0, playerlist_pos);
 
-						stringstream ss;
-						ss << rand();
-						string cache_dir = "cache\\" + ss.str();
-						twitch_launch_irc(cache_dir, twitch_name);
+						twitch_launch_irc(twitch_name);
 						irc_started = true;
 					}
 				}
