@@ -43,6 +43,9 @@ void twitch_launch_irc(string twitch_name) {
 void twitch_terminate_irc() {
     UINT exit_code = 0;
     TerminateProcess((HANDLE)irc_process, exit_code);
+
+    CloseHandle(players_handle);
+    CloseHandle(bits_handle);
 }
 
 void twitch_update_players(struct bit_field* bf_rw) {

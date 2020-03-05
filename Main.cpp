@@ -758,7 +758,5 @@ int main(int argc, char** argv) {
 	string s_fields[5] = { "twitch_name", "bits_bandage", "bits_shield", "bits_game", "max_players" };
 	ui_save_fields_to_file(&bf_rw, "settings", s_fields, 5, "./", "settings.cfg");
 
-	twitch_terminate_irc();
-
 	return 0;
 }

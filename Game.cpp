@@ -12,6 +12,7 @@
 #include "Storm.hpp"
 #include "UI.hpp"
 #include "AssetLoader.hpp"
+#include "TwitchIntegration.hpp"
 
 void game_init() {
 	printf("initialising game\n");
@@ -96,8 +97,6 @@ void game_start() {
 	//players_upload(&bf_rw);
 
 	killfeed_init(&bf_rw);
-
-	ui_value_as_config(&bf_rw, "ingame_overlay", "killfeed", 0, kill_feed_pos);
 
 	leaderboard_init(&bf_rw);
 
@@ -218,6 +217,27 @@ void game_destroy() {
 
 	//reset storm
 	storm_destroy();
+
+	//kill irc
+	twitch_terminate_irc();
+	irc_started = false;
+
+	//remove players
+	players.clear();
+
+	//remove playerlist
+	bit_field_remove_bulk_from_segment(&bf_rw, playerlist_pos - 1);
+	playerlist_count = 0;
+
+	//remove entities
+	entities.clear();
+	bit_field_remove_bulk_from_segment(&bf_rw, entities_position - 1);
+
+	//killfeed reset
+	killfeed_reset(&bf_rw);
+
+	//leaderboard reset
+	leaderboard_reset(&bf_rw);
 
 	target_ticks_per_second = 30;
 }

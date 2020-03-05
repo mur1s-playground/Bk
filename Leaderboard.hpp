@@ -29,5 +29,6 @@ using namespace std;
 
 void leaderboard_init(struct bit_field* bf_rw);
 void leaderboard_add(struct bit_field* bf_rw, const char playername[50], const unsigned int dmg, const unsigned int kills, const char shooter[50]);
+void leaderboard_reset(struct bit_field* bf_rw);
 
 #endif

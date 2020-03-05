@@ -43,5 +43,6 @@ extern struct kill_feed_element* kill_feed;
 
 void killfeed_init(struct bit_field *bf_rw);
 void killfeed_add(struct bit_field* bf_rw, char shooter[50], char victim[50], bool storm = false);
+void killfeed_reset(struct bit_field* bf_rw);
 
 #endif

@@ -11,6 +11,8 @@ void killfeed_init(struct bit_field* bf_rw) {
 	int size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
 
 	kill_feed_pos = bit_field_add_bulk_zero(bf_rw, size_in_bf)+1;
+
+	ui_value_as_config(bf_rw, "ingame_overlay", "killfeed", 0, kill_feed_pos);
 }
 
 void killfeed_add(struct bit_field* bf_rw, char shooter[50], char victim[50], bool storm) {
@@ -27,4 +29,10 @@ void killfeed_add(struct bit_field* bf_rw, char shooter[50], char victim[50], bo
 	kill_count++;
 
 	ui_value_as_config(bf_rw, "ingame_overlay", "killfeed", 1, kill_count);
+}
+
+void killfeed_reset(struct bit_field* bf_rw) {
+	bit_field_remove_bulk_from_segment(bf_rw, kill_feed_pos - 1);
+	kill_count = 0;
+	kill_feed_pos = 0;
 }

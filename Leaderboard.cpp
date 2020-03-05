@@ -83,3 +83,17 @@ void leaderboard_add(struct bit_field* bf_rw, const char playername[50], const u
 	
 	leaderboard_count++;
 }
+
+void leaderboard_reset(struct bit_field *bf_rw) {
+	bit_field_remove_bulk_from_segment(bf_rw, leaderboard_place_pos - 1);
+	bit_field_remove_bulk_from_segment(bf_rw, leaderboard_player_pos - 1);
+	bit_field_remove_bulk_from_segment(bf_rw, leaderboard_dmg_pos - 1);
+	bit_field_remove_bulk_from_segment(bf_rw, leaderboard_kills_pos - 1);
+	bit_field_remove_bulk_from_segment(bf_rw, leaderboard_killedby_pos - 1);
+	leaderboard_place_pos = 0;
+	leaderboard_player_pos = 0;
+	leaderboard_dmg_pos = 0;
+	leaderboard_kills_pos = 0;
+	leaderboard_killedby_pos = 0;
+	leaderboard_count = 0;
+}
