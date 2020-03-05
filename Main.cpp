@@ -13,6 +13,7 @@
 #include "Entity.hpp"
 #include "TwitchIntegration.hpp"
 #include "KillFeed.hpp"
+#include "Buyfeed.hpp"
 #include "Playerlist.hpp"
 #include "Leaderboard.hpp"
 #include "Util.hpp"
@@ -323,6 +324,7 @@ int main(int argc, char** argv) {
 													has_inv_space--;
 													bits_shield[name_str] -= bits_per_shield;
 													bits_spent[name_str] += bits_per_shield;
+													buyfeed_add(&bf_rw, en->name, 51);
 													//printf("bought shield, spent %i\n", bits_spent[name_str]);
 													break;
 												}
@@ -342,6 +344,7 @@ int main(int argc, char** argv) {
 														has_inv_space--;
 														bits_bandage[name_str] -= bits_per_bandage;
 														bits_spent[name_str] += bits_per_bandage;
+														buyfeed_add(&bf_rw, en->name, 52);
 														//printf("bought bandage, spent %i\n", bits_spent[name_str]);
 														break;
 													}
@@ -686,11 +689,18 @@ int main(int argc, char** argv) {
 					}
 					players_it++;
 				}
+				if (ui_active == "unloading_game") {
+					game_started = false;
+					game_destroy();
+					ui_set_active("main_menu");
+				}
 			} else {
-				if (ui_active == "loading") {
+				if (ui_active == "loading_game") {
 					game_init();
 					game_start();
 					camera_get_crop(camera_crop);
+					ui_set_active("ingame_overlay");
+					game_started = true;
 				}
 				if (ui_active == "lobby" && irc_started) {
 					twitch_update_players(&bf_rw);

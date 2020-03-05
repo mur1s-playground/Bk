@@ -27,13 +27,8 @@ __host__ void grid_init(struct bit_field* bf, struct grid* out_grid, const vecto
     out_grid->center = center;
 
     unsigned int total_size_in_bf = (total_dim[2] * (total_dim[1] * total_dim[0]) + total_dim[1] * total_dim[1] + total_dim[0]);
-    //unsigned int total_size_in_mem = total_size_in_bf * sizeof(unsigned int);
-
-    //unsigned int* init_storage = (unsigned int*)malloc(total_size_in_mem);
-    //memset(init_storage, (unsigned int)0, total_size_in_mem);
-
+    
     out_grid->data_position_in_bf = bit_field_add_bulk_zero(bf, total_size_in_bf);
-    //out_grid->data_position_in_bf = bit_field_add_bulk(bf, init_storage, total_size_in_bf, total_size_in_mem);
     out_grid->position_in_bf = bit_field_add_bulk(bf, (unsigned int*)out_grid, SIZEOF_GRID_IN_BF, SIZEOF_GRID);
 }
 

@@ -83,6 +83,7 @@
   <ItemGroup>
     <ClCompile Include="AssetLoader.cpp" />
     <ClCompile Include="BitField.cpp" />
+    <ClCompile Include="Buyfeed.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Item.cpp" />
@@ -100,6 +101,7 @@
   <ItemGroup>
     <ClInclude Include="AssetLoader.hpp" />
     <ClInclude Include="BitField.hpp" />
+    <ClInclude Include="Buyfeed.hpp" />
     <ClInclude Include="Camera.hpp" />
     <ClInclude Include="Entity.hpp" />
     <ClInclude Include="Game.hpp" />

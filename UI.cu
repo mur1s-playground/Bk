@@ -457,10 +457,10 @@ bool ui_process_click(struct bit_field *bf_rw, unsigned int x, unsigned int y) {
                     running = false;
                     break;
                 } else if (ocat == BAT_GAMESTART) {
-                    ui_set_active("loading");
+                    ui_set_active("loading_game");
                     break;
                 } else if (ocat == BAT_GAMEEND) {
-                    game_destroy();
+                    ui_set_active("unloading_game");
                     break;
                 } else if (ocat == BAT_UI) {
                     ui_set_active(on_click_action_param);

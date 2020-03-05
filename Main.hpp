@@ -28,4 +28,7 @@ extern map<string, int>				bits_spent;
 extern map<string, int>				bits_shield;
 extern map<string, int>				bits_bandage;
 
+extern int top_kills;
+extern int top_damage;
+
 #endif

@@ -7,6 +7,7 @@
 #include "Grid.hpp"
 #include "Entity.hpp"
 #include "KillFeed.hpp"
+#include "Buyfeed.hpp"
 #include "Leaderboard.hpp"
 #include "Map.hpp"
 #include "Storm.hpp"
@@ -99,6 +100,8 @@ void game_start() {
 	killfeed_init(&bf_rw);
 
 	leaderboard_init(&bf_rw);
+
+	buyfeed_init(&bf_rw);
 
 	//spawn weapons
 	unsigned int weapon_count = max(100, (int)players.size());
@@ -199,21 +202,17 @@ void game_start() {
 	entities_upload(&bf_rw);
 
 	bit_field_update_device(&bf_rw, 0);
-
-	ui_set_active("ingame_overlay");
-	game_started = true;
 }
 
 void game_destroy() {
-	game_started = false;
-	ui_set_active("main_menu");
-
 	//unload map
 	asset_loader_unload_by_containing(&bf_assets, "./maps/" + ui_textfield_get_value(&bf_rw, "lobby", "selected_map") + "/");
+	map_models.clear();
+	bit_field_remove_bulk_from_segment(&bf_assets, map_models_position-1);
 
 	//unload grid
-	bit_field_remove_bulk_from_segment(&bf_rw, gd.position_in_bf);
 	bit_field_remove_bulk_from_segment(&bf_rw, gd.data_position_in_bf);
+	bit_field_remove_bulk_from_segment(&bf_rw, gd.position_in_bf);
 
 	//reset storm
 	storm_destroy();
@@ -229,6 +228,17 @@ void game_destroy() {
 	bit_field_remove_bulk_from_segment(&bf_rw, playerlist_pos - 1);
 	playerlist_count = 0;
 
+	//reset ui elements
+	char tmp = '\0';
+	top_kills = 0;
+	top_damage = 0;
+	ui_textfield_set_value(&bf_rw, "ingame_menu", "top_kills", &tmp);
+	ui_textfield_set_value(&bf_rw, "ingame_menu", "top_kills_nr", &tmp);
+	ui_textfield_set_value(&bf_rw, "ingame_menu", "top_damage", &tmp);
+	ui_textfield_set_value(&bf_rw, "ingame_menu", "top_damage_nr", &tmp);
+	ui_textfield_set_value(&bf_rw, "ingame_menu", "top_placement", &tmp);
+	ui_textfield_set_int(&bf_rw, "lobby", "playercount", 0);
+
 	//remove entities
 	entities.clear();
 	bit_field_remove_bulk_from_segment(&bf_rw, entities_position - 1);
@@ -238,6 +248,9 @@ void game_destroy() {
 
 	//leaderboard reset
 	leaderboard_reset(&bf_rw);
+
+	//buyfeed reset
+	buyfeed_reset(&bf_rw);
 
 	target_ticks_per_second = 30;
 }

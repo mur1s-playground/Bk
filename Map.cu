@@ -350,9 +350,10 @@ void map_load(struct bit_field *bf_assets, string name) {
 
 void map_add_static_assets(struct bit_field* bf_assets, struct bit_field* bf_grid, struct grid* gd) {
     printf("starting static asset addition\n");
-    unsigned char* static_asset_frame = (unsigned char *) &bf_assets->data[gm.map_static_assets_position];
+    
     for (int y = 0; y < gm.map_dimensions[1]; y++) {
         for (int x = 0; x < gm.map_dimensions[0]; x++) {
+            unsigned char* static_asset_frame = (unsigned char*)&bf_assets->data[gm.map_static_assets_position];
             unsigned char pixel_alpha = static_asset_frame[y * gm.map_dimensions[0] * 4 + x * 4 + 3];
             if (pixel_alpha > 0) {
                 unsigned char pixel_r = static_asset_frame[y * gm.map_dimensions[0] * 4 + x * 4 + 0];

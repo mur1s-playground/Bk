@@ -7,6 +7,7 @@
 #include "Player.hpp"
 #include "Playerlist.hpp"
 #include <sstream>
+#include <time.h>
 
 string cache_dir = "";
 
@@ -18,9 +19,11 @@ intptr_t irc_process;
 void twitch_launch_irc(string twitch_name) {
     stringstream ss;
     string cache_dir_;
+    time_t ltime;
     do {
         ss.clear();
-        ss << rand();
+        time(&ltime);
+        ss << (long long)ltime;
         cache_dir_ = "cache\\" + ss.str();
     } while (dir_exists(cache_dir_));
     cache_dir = cache_dir_;
@@ -81,7 +84,9 @@ void twitch_update_players(struct bit_field* bf_rw) {
         if (i % 2 == 0) nnnn += "__________________";
         if (players.size() < players_max) {
             player_add(bf_rw, nnnn, PT_HOPE, UINT_MAX);
-
+            bits_spent.emplace(nnnn, 0);
+            bits_shield.emplace(nnnn, 200);
+            bits_bandage.emplace(nnnn, 200);
         }
     }
     */
