@@ -218,7 +218,7 @@ int main(int argc, char** argv) {
 								if (uis[ui_active].active_element_param > -1) {
 									string map_name = map_name_from_index(&bf_rw, uis[ui_active].active_element_param);
 									ui_textfield_set_value(&bf_rw, "lobby", "selected_map", map_name.c_str());
-									string map_asset_path = "./maps/" + map_name + "/" + map_name + "_minimap.png";
+									string map_asset_path = "./maps/" + map_name + "_minimap.png";
 									ui_value_as_config(&bf_rw, "lobby", "minimap", 0, assets[map_asset_path]);
 									ui_value_as_config(&bf_rw, "lobby", "minimap", 1, assets_dimensions[map_asset_path].width);
 									ui_value_as_config(&bf_rw, "lobby", "minimap", 2, assets_dimensions[map_asset_path].height);
@@ -262,15 +262,18 @@ int main(int argc, char** argv) {
 		sdl_update_frame((Uint32*)&bf_output.data[output_position]);
 
 		if (game_started) {
-			struct entity* es = (struct entity*) &bf_rw.data[entities_position];
 			map<string, struct player>::iterator players_it = players.begin();
 			float player_dist_per_tick = 1 / 5.0f;
 			int orientation_change_per_tick = 3;
 			while (players_it != players.end()) {
+				//struct entity* es = (struct entity*) & bf_rw.data[entities_position];
 				struct player* pl = &players_it->second;
 				if (pl->alive) {
 					if (pl->entity_id < UINT_MAX) {
-						struct entity* en = &es[pl->entity_id];
+						struct entity* es = (struct entity*) &bf_rw.data[entities_position];
+						struct entity* en = (struct entity *) &es[pl->entity_id];
+						
+						//struct entity* en = &es[pl->entity_id];
 						int has_inv_space = 0;
 						int has_gun = -1;
 						for (int inv = 0; inv < 6; inv++) {
@@ -586,10 +589,16 @@ int main(int argc, char** argv) {
 
 							//object itself
 							grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
+							es = (struct entity*) & bf_rw.data[entities_position];
+							en = (struct entity*) & es[pl->entity_id];
 							//object text
 							grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+							es = (struct entity*) & bf_rw.data[entities_position];
+							en = (struct entity*) & es[pl->entity_id];
 							//object inventory
 							grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f*6, 0 }, pl->entity_id);
+							es = (struct entity*) & bf_rw.data[entities_position];
+							en = (struct entity*) & es[pl->entity_id];
 						}
 						en->params[0] = (char)players_it->second.health;
 						en->params[1] = (char)players_it->second.shield;
@@ -604,6 +613,7 @@ int main(int argc, char** argv) {
 				players_it++;
 			}
 			players_it = players.begin();
+			struct entity* es = (struct entity*) & bf_rw.data[entities_position];
 			while (players_it != players.end()) {
 				struct player* pl = &players_it->second;
 				if (pl->kills > top_kills) {
@@ -698,7 +708,7 @@ int main(int argc, char** argv) {
 
 						string map_name = map_name_from_index(&bf_rw, 0);
 						ui_textfield_set_value(&bf_rw, "lobby", "selected_map", map_name.c_str());
-						string map_asset_path = "./maps/" + map_name + "/" + map_name + "_minimap.png";
+						string map_asset_path = "./maps/" + map_name + "_minimap.png";
 						ui_value_as_config(&bf_rw, "lobby", "minimap", 0, assets[map_asset_path]);
 						ui_value_as_config(&bf_rw, "lobby", "minimap", 1, assets_dimensions[map_asset_path].width);
 						ui_value_as_config(&bf_rw, "lobby", "minimap", 2, assets_dimensions[map_asset_path].height);

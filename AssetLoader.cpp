@@ -50,3 +50,23 @@ void asset_loader_load_map(struct bit_field* asset_store, string folder, string 
 		asset_loader_load_file(asset_store, "./maps/" + folder + "/", png_files[i], channels);
 	}
 }
+
+void asset_loader_unload_file(struct bit_field* asset_store, string asset_path) {
+	if (assets[asset_path] > 0) {
+		int asset_position = assets[asset_path] - 1;
+		assets.erase(asset_path);
+		assets_dimensions.erase(asset_path);
+		printf("unloading asset: %s\n", asset_path.c_str());
+		bit_field_remove_bulk_from_segment(asset_store, asset_position);
+	}
+}
+
+void asset_loader_unload_by_containing(struct bit_field* asset_store, string assetpath_contains) {
+	map<string, unsigned int>::iterator assets_it = assets.begin();
+	while (assets_it != assets.end()) {
+		if (assets_it->first.find(assetpath_contains) != string::npos) {
+			asset_loader_unload_file(asset_store, assets_it->first);
+		}
+		assets_it++;
+	}
+}

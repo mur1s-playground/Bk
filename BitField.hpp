@@ -32,6 +32,7 @@ void bit_field_update_bulk(struct bit_field* bf, const unsigned int index, const
 void bit_field_invalidate_bulk(struct bit_field* bf, const unsigned int index, const unsigned int data_len_in_bf);
 
 unsigned int bit_field_remove_data_from_segment(struct bit_field* bf, const unsigned int index, const unsigned int datum);
+void bit_field_remove_bulk_from_segment(struct bit_field* bf, const unsigned int index);
 
 unsigned int bit_field_register_device(struct bit_field* bf, unsigned int device_id);
 void bit_field_update_device(const struct bit_field* bf, unsigned int device_id);

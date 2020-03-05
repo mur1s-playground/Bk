@@ -11,6 +11,7 @@
 #include "Map.hpp"
 #include "Storm.hpp"
 #include "UI.hpp"
+#include "AssetLoader.hpp"
 
 void game_init() {
 	printf("initialising game\n");
@@ -92,7 +93,7 @@ void game_start() {
 	}
 
 	bit_field_update_device(&bf_assets, 0);
-	players_upload(&bf_rw);
+	//players_upload(&bf_rw);
 
 	killfeed_init(&bf_rw);
 
@@ -207,4 +208,16 @@ void game_start() {
 void game_destroy() {
 	game_started = false;
 	ui_set_active("main_menu");
+
+	//unload map
+	asset_loader_unload_by_containing(&bf_assets, "./maps/" + ui_textfield_get_value(&bf_rw, "lobby", "selected_map") + "/");
+
+	//unload grid
+	bit_field_remove_bulk_from_segment(&bf_rw, gd.position_in_bf);
+	bit_field_remove_bulk_from_segment(&bf_rw, gd.data_position_in_bf);
+
+	//reset storm
+	storm_destroy();
+
+	target_ticks_per_second = 30;
 }

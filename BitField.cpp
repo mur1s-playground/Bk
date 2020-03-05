@@ -329,6 +329,14 @@ unsigned int bit_field_remove_data_from_segment(struct bit_field* bf, const unsi
 	return index;
 }
 
+void bit_field_remove_bulk_from_segment(struct bit_field* bf, const unsigned int index) {
+	int page = bit_field_get_page_from_index(bf, index);
+	int pagetype = bit_field_get_pagetype_from_index(bf, index);
+	unsigned int size = bf->data[index];
+	memset(&bf->data[index], 0, (size+1u)*sizeof(unsigned int));
+	bit_field_invalidate_bulk(bf, index, size+1u);
+}
+
 /* INTERNAL */
 unsigned int bit_field_register_invalidator(struct bit_field* bf) {
 	if (bf->invalidators_c == 0) {

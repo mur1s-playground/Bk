@@ -238,7 +238,7 @@ void map_list_init(struct bit_field *bf_rw) {
         size_t pos = maps_cfgs[i].find_last_of(".");
         if (pos != string::npos) {
             string map_name_prefix = maps_cfgs[i].substr(0, pos);
-            asset_loader_load_file(&bf_assets, "./maps/" + map_name_prefix + "/", map_name_prefix + "_minimap.png", 4);
+            asset_loader_load_file(&bf_assets, "./maps/", map_name_prefix + "_minimap.png", 4);
             struct maplist_element mes(map_name_prefix.c_str());
             memcpy(&me[map_count++], &mes, sizeof(struct maplist_element));
         }

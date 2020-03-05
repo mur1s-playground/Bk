@@ -200,3 +200,10 @@ float storm_next_move_time(vector3<float> position, float dist_per_tick) {
 	}
 	return 0.0f;
 }
+
+void storm_destroy() {
+	storm_phase_start_ticks.clear();
+	storm_phase_duration_ticks.clear();
+	storm_phase_mapratio.clear();
+	storm_phase_dps.clear();
+}

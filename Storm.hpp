@@ -26,6 +26,7 @@ void storm_init(struct bit_field* bf_map, struct bit_field* bf_rw);
 void storm_next(struct bit_field* bf_map, struct bit_field* bf_rw);
 bool storm_is_in(vector3<float> position);
 float storm_next_move_time(vector3<float> position, float dist_per_tick);
+void storm_destroy();
 
 void launch_draw_storm_kernel(unsigned int* device_output_data, const unsigned int output_position, const unsigned int width, const unsigned int height, const unsigned int channels, const unsigned int camera_crop_x1, const unsigned int camera_crop_y1, const float camera_z, const struct storm storm_current, const struct storm storm_to, const unsigned int storm_alpha, const struct vector3<unsigned char> storm_color);
 
