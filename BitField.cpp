@@ -19,6 +19,7 @@ void bit_field_init(struct bit_field* bf, unsigned int pages, unsigned int pages
 	bf->devices_c = 0;
 
 	bf->biggest_tracked_allocated_page = 0;
+	bf->device_add_pages = 0;
 }
 
 /* INTERNAL */
@@ -38,15 +39,21 @@ void bit_field_add_pages(struct bit_field* bf, unsigned int pages) {
 		bf->invalidators[i] = (unsigned char*)realloc(&(*bf->invalidators[i]), (bf->pages + 7 + pages + 7) / 8 * sizeof(unsigned char));
 		memset(&(bf->invalidators[i])[(bf->pages + 7) / 8], 1, (pages + 7) / 8 * sizeof(unsigned char));
 	}
-	for (int i = 0; i < bf->devices_c; i++) {
-		unsigned int* device_ptr = NULL;
-		cudaError_t err = cudaSuccess;
-		err = cudaSetDevice(bf->device_ids[i]);
-		err = cudaMalloc((void**)&device_ptr, (bf->pages + pages) * (bf->pagesize + 1) * sizeof(int));
-		err = cudaMemcpy(device_ptr, bf->device_data[i], bf->pages * (bf->pagesize + 1) * sizeof(int), cudaMemcpyDeviceToDevice);
-		cudaFree(bf->device_data[i]);												//maybe do some delayed free
-		bf->device_data[i] = device_ptr;
-	}
+	if (bf->devices_c > 0) {
+		bf->device_add_pages += pages;
+	} //else {
+	/*
+		for (int i = 0; i < bf->devices_c; i++) {
+			unsigned int* device_ptr = NULL;
+			cudaError_t err = cudaSuccess;
+			err = cudaSetDevice(bf->device_ids[i]);
+			err = cudaMalloc((void**)&device_ptr, (bf->pages + pages) * (bf->pagesize + 1) * sizeof(int));
+			err = cudaMemcpy(device_ptr, bf->device_data[i], (bf->pages) * (bf->pagesize + 1) * sizeof(int), cudaMemcpyDeviceToDevice);
+			cudaFree(bf->device_data[i]);												//maybe do some delayed free
+			bf->device_data[i] = device_ptr;
+		}
+		*/
+	//}
 	bf->pages += pages;
 }
 
@@ -355,12 +362,15 @@ unsigned int bit_field_register_device(struct bit_field* bf, unsigned int device
 	if (bf->devices_c == 0) {
 		bf->device_data = (unsigned int**)malloc(sizeof(unsigned int*));
 		bf->device_ids = (unsigned int*)malloc(sizeof(unsigned int));
-	}
-	else {
+		bf->device_locks = (HANDLE*)malloc(sizeof(HANDLE*));
+	} else {
 		bf->device_data = (unsigned int**)realloc(bf->device_data, (bf->devices_c + 1) * sizeof(unsigned int*));
 		bf->device_ids = (unsigned int*)realloc(bf->device_ids, (bf->devices_c + 1) * sizeof(unsigned int));
+		bf->device_locks = (HANDLE*)realloc(bf->device_locks, (bf->devices_c+1) * sizeof(HANDLE*));
+		
 	}
 	bit_field_register_invalidator(bf);
+	bf->device_locks[bf->devices_c] = CreateMutex(NULL, FALSE, NULL);
 
 	cudaError_t err = cudaSuccess;
 	err = cudaSetDevice(device_id);
@@ -374,9 +384,23 @@ unsigned int bit_field_register_device(struct bit_field* bf, unsigned int device
 	return bf->devices_c - 1;
 }
 
-void bit_field_update_device(const struct bit_field* bf, unsigned int device_id) {
+void bit_field_update_device(struct bit_field* bf, unsigned int device_id) {
 	cudaError_t err = cudaSuccess;
 	err = cudaSetDevice(device_id);
+	WaitForSingleObject(bf->device_locks[device_id], INFINITE);
+	//FIX: multigpu
+	if (bf->device_add_pages > 0) {
+		for (int i = 0; i < bf->devices_c; i++) {
+			unsigned int* device_ptr = NULL;
+			cudaError_t err = cudaSuccess;
+			err = cudaSetDevice(bf->device_ids[i]);
+			err = cudaMalloc((void**)&device_ptr, (bf->pages) * (bf->pagesize + 1) * sizeof(int));
+			err = cudaMemcpy(device_ptr, bf->device_data[i], (bf->pages-bf->device_add_pages) * (bf->pagesize + 1) * sizeof(int), cudaMemcpyDeviceToDevice);
+			cudaFree(bf->device_data[i]);												//maybe do some delayed free
+			bf->device_data[i] = device_ptr;
+		}
+		bf->device_add_pages = 0;
+	}
 	for (int i = 0; i < bf->devices_c; i++) {
 		if (bf->device_ids[i] == device_id) {
 			int cp_size = 0;
@@ -419,6 +443,7 @@ void bit_field_update_device(const struct bit_field* bf, unsigned int device_id)
 			break;
 		}
 	}
+	ReleaseMutex(bf->device_locks[device_id]);
 }
 
 void bit_field_update_host(struct bit_field* bf, unsigned int device_id) {

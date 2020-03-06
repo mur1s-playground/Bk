@@ -2,6 +2,9 @@
 #define BITFIELD_HPP
 
 #include <string>
+#include <windows.h>
+
+using namespace std;
 
 struct bit_field {
 	unsigned int pages;
@@ -16,6 +19,10 @@ struct bit_field {
 	unsigned int devices_c;
 
 	unsigned int biggest_tracked_allocated_page;
+
+	HANDLE* device_locks;
+	//FIX: multigpu
+	unsigned int device_add_pages;
 };
 
 void bit_field_init(struct bit_field* bf, unsigned int pages, unsigned int pagesize);
@@ -35,7 +42,7 @@ unsigned int bit_field_remove_data_from_segment(struct bit_field* bf, const unsi
 void bit_field_remove_bulk_from_segment(struct bit_field* bf, const unsigned int index);
 
 unsigned int bit_field_register_device(struct bit_field* bf, unsigned int device_id);
-void bit_field_update_device(const struct bit_field* bf, unsigned int device_id);
+void bit_field_update_device(struct bit_field* bf, unsigned int device_id);
 
 void bit_field_update_host(struct bit_field* bf, unsigned int device_id);
 

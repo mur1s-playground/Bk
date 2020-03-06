@@ -20,28 +20,32 @@ void leaderboard_init(struct bit_field* bf_rw) {
 	place_size_in_bf = size_in_bf;
 	leaderboard_place_pos = bit_field_add_bulk_zero(bf_rw, size_in_bf) + 1;
 	ui_value_as_config(bf_rw, "ingame_menu", "leaderboard_place", 0, leaderboard_place_pos);
+	ui_value_as_config(bf_rw, "ingame_menu", "leaderboard_place", 1, 0);
 	
 	size = players.size() * sizeof(struct playerlist_element);
 	size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
 	player_size_in_bf = size_in_bf;
 	leaderboard_player_pos = bit_field_add_bulk_zero(bf_rw, size_in_bf) + 1;
 	ui_value_as_config(bf_rw, "ingame_menu", "leaderboard_player", 0, leaderboard_player_pos);
-	
+	ui_value_as_config(bf_rw, "ingame_menu", "leaderboard_player", 1, 0);
+
 	size = players.size() * sizeof(struct leaderboard_place_element);
 	size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
 	leaderboard_dmg_pos = bit_field_add_bulk_zero(bf_rw, size_in_bf) + 1;
 	ui_value_as_config(bf_rw, "ingame_menu", "leaderboard_dmg", 0, leaderboard_dmg_pos);
+	ui_value_as_config(bf_rw, "ingame_menu", "leaderboard_dmg", 1, 0);
 	
 	size = players.size() * sizeof(struct leaderboard_place_element);
 	size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
 	leaderboard_kills_pos = bit_field_add_bulk_zero(bf_rw, size_in_bf) + 1;
 	ui_value_as_config(bf_rw, "ingame_menu", "leaderboard_kills", 0, leaderboard_kills_pos);
+	ui_value_as_config(bf_rw, "ingame_menu", "leaderboard_kills", 1, 0);
 
 	size = players.size() * sizeof(struct playerlist_element);
 	size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
 	leaderboard_killedby_pos = bit_field_add_bulk_zero(bf_rw, size_in_bf) + 1;
 	ui_value_as_config(bf_rw, "ingame_menu", "leaderboard_killedby", 0, leaderboard_killedby_pos);
-	
+	ui_value_as_config(bf_rw, "ingame_menu", "leaderboard_killedby", 1, 0);
 }
 
 void leaderboard_add(struct bit_field* bf_rw, const char playername[50], const unsigned int dmg, const unsigned int kills, const char shooter[50]) {

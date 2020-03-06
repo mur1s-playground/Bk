@@ -163,7 +163,15 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                     if (current_x >= uie->x1y1[0] && current_x < uie->x2y2[0] && current_y >= uie->x1y1[1] && current_y < uie->x2y2[1]) {
                         int* config = (int*)&uie->value[0];
 
-                        int image_position = config[0];
+                        int image_positions = config[0];
+                        int animation_ticks = config[3];
+                        int animation_stepsize = config[4];
+
+                        int image_position = image_positions;
+                        if (animation_ticks > 1) {
+                            int image_idx = (tick_counter / animation_stepsize) % animation_ticks;
+                            image_position = bf_assets_data[config[0] + image_idx];
+                        }
 
                         if (image_position > 0) {
                             int image_width = config[1];
@@ -419,9 +427,37 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
                             t.x2y2 = { (unsigned int)stoi(first), (unsigned int)stoi(second) };
                         }
                     }
+                    config[3] = 1;
+                    if (kv_pairs[i + 3].first == kv_pairs[i].second + "_animation_ticks") {
+                        string first = kv_pairs[i + 3].second;
+                        first = trim(first);
+                        config[3] = stoi(first);
+                    }
+                    config[4] = 1;
+                    if (kv_pairs[i + 4].first == kv_pairs[i].second + "_animation_stepsize") {
+                        string first = kv_pairs[i + 4].second;
+                        first = trim(first);
+                        config[4] = stoi(first);
+                    }
                     config[0] = 0;
                     config[1] = 0;
                     config[2] = 0;
+                    if (kv_pairs[i + 5].first == kv_pairs[i].second + "_file_prefix") {
+                        string first = kv_pairs[i + 5].second;
+                        first = trim(first);
+                        vector<unsigned int> asset_positions;
+                        for (int ap = 0; ap < config[3]; ap++) {
+                            stringstream ss_ap;
+                            ss_ap << ap;
+                            asset_positions.push_back(assets["./ui/" + content_folder + "/" + first + ss_ap.str() + ".png"]);
+                            if (ap == 0) {
+                                config[1] = assets_dimensions["./ui/" + content_folder + "/" + first + ss_ap.str() + ".png"].width;
+                                config[2] = assets_dimensions["./ui/" + content_folder + "/" + first + ss_ap.str() + ".png"].height;
+                            }
+                        }
+                        config[0] = bit_field_add_bulk(bf_assets, asset_positions.data(), asset_positions.size(), asset_positions.size()*sizeof(unsigned int))+1;
+                    }
+                    
                     printf("adding image %s\n", t.name.c_str());
                     u.ui_elements.push_back(t);
                 }
@@ -466,7 +502,7 @@ bool ui_process_click(struct bit_field *bf_rw, unsigned int x, unsigned int y) {
                     ui_set_active(on_click_action_param);
                     break;
                 } else if (ocat == BAT_GS) {
-                    target_ticks_per_second = stoi(on_click_action_param);
+                    game_ticks_target = stoi(on_click_action_param);
                     break;
                 }
             } else if (active_elements[i].uet == UET_TEXTFIELD) {

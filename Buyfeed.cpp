@@ -17,6 +17,7 @@ void buyfeed_init(struct bit_field* bf_rw) {
 	buy_feed_pos = bit_field_add_bulk_zero(bf_rw, size_in_bf) + 1;
 
 	ui_value_as_config(bf_rw, "ingame_overlay", "buyfeed", 0, buy_feed_pos);
+	ui_value_as_config(bf_rw, "ingame_overlay", "buyfeed", 1, buy_feed_count);
 }
 
 void buyfeed_add(struct bit_field* bf_rw, char buyer[50], int item_id) {
@@ -77,4 +78,5 @@ void buyfeed_reset(struct bit_field* bf_rw) {
 	bit_field_remove_bulk_from_segment(bf_rw, buy_feed_pos - 1);
 	buy_feed_count = 0;
 	buy_feed_pos = 0;
+	buy_feed_map.clear();
 }

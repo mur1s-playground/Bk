@@ -202,6 +202,8 @@ float storm_next_move_time(vector3<float> position, float dist_per_tick) {
 }
 
 void storm_destroy() {
+	storm_phase_current = 0;
+	storm_phase_time = 0;
 	storm_phase_start_ticks.clear();
 	storm_phase_duration_ticks.clear();
 	storm_phase_mapratio.clear();

@@ -30,5 +30,6 @@ extern struct playerlist_element* playerlist;
 
 void playerlist_init(struct bit_field* bf_rw);
 void playerlist_add(struct bit_field* bf_rw, const char playername[50]);
+void playerlist_reset(struct bit_field* bf_rw);
 
 #endif

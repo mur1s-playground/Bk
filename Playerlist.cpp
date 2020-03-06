@@ -11,6 +11,8 @@ void playerlist_init(struct bit_field* bf_rw) {
 	int size_in_bf = (int)ceilf(size / (float)sizeof(unsigned int));
 
 	playerlist_pos = bit_field_add_bulk_zero(bf_rw, size_in_bf) + 1;
+	ui_value_as_config(bf_rw, "lobby", "players", 0, playerlist_pos);
+	ui_value_as_config(bf_rw, "lobby", "players", 1, playerlist_count);
 }
 
 void playerlist_add(struct bit_field* bf_rw, const char playername[50]) {
@@ -27,4 +29,10 @@ void playerlist_add(struct bit_field* bf_rw, const char playername[50]) {
 	playerlist_count++;
 
 	ui_value_as_config(bf_rw, "lobby", "players", 1, playerlist_count);
+}
+
+void playerlist_reset(struct bit_field *bf_rw) {
+	bit_field_remove_bulk_from_segment(bf_rw, playerlist_pos - 1);
+	playerlist_pos = 0;
+	playerlist_count = 0;
 }
