@@ -15,6 +15,7 @@ enum player_type {
 };
 
 enum player_action_type {
+	PAT_BUY_ITEM,
 	PAT_PICKUP_ITEM,
 	PAT_SHOOT_AT,
 	PAT_MOVE

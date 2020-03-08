@@ -338,42 +338,24 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					map<string, int>::iterator bit_it = bits_spent.find(name_str);
 					if (bit_it != bits_spent.end()) {
 						int spent = bit_it->second;
-						if (bits_spent[name_str] < max_bits_per_game) {
+						if (spent < max_bits_per_game) {
 							map<string, int>::iterator bit_it_s = bits_shield.find(name_str);
 							if (bit_it_s != bits_shield.end()) {
 								if (bit_it_s->second >= bits_per_shield) {
-									for (int inv = 0; inv < 6; inv++) {
-										if (pl->inventory[inv].item_id == UINT_MAX) {
-											pl->inventory[inv].item_id = 51;
-											pl->inventory[inv].item_param = 2;
-											has_inv_space--;
-											bits_shield[name_str] -= bits_per_shield;
-											bits_spent[name_str] += bits_per_shield;
-											buyfeed_add(&bf_rw, en->name, 51);
-											//printf("bought shield, spent %i\n", bits_spent[name_str]);
-											break;
-										}
-									}
+									player_action_param_add(pl, PAT_BUY_ITEM, 51, 0);
+									has_inv_space--;
+									spent += bits_per_shield;
 								}
 							}
 						}
-						if (bits_spent[name_str] < max_bits_per_game) {
+						if (spent < max_bits_per_game) {
 							if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
 								map<string, int>::iterator bit_it_b = bits_bandage.find(name_str);
 								if (bit_it_b != bits_bandage.end()) {
 									if (bit_it_b->second >= bits_per_bandage) {
-										for (int inv = 0; inv < 6; inv++) {
-											if (pl->inventory[inv].item_id == UINT_MAX) {
-												pl->inventory[inv].item_id = 52;
-												pl->inventory[inv].item_param = 5;
-												has_inv_space--;
-												bits_bandage[name_str] -= bits_per_bandage;
-												bits_spent[name_str] += bits_per_bandage;
-												buyfeed_add(&bf_rw, en->name, 52);
-												//printf("bought bandage, spent %i\n", bits_spent[name_str]);
-												break;
-											}
-										}
+										player_action_param_add(pl, PAT_BUY_ITEM, 52, 0);
+										has_inv_space--;
+										spent += bits_per_bandage;
 									}
 								}
 							}
@@ -719,6 +701,35 @@ void game_tick() {
 										}
 										break;
 									}
+								}
+							}
+						}
+					}
+				} else if (pap_start[0] == PAT_BUY_ITEM) {
+					if (pl->entity_id < UINT_MAX) {
+						string name_str(pl->name);
+						if (pap_start[1] == 51) {
+							for (int inv = 0; inv < 6; inv++) {
+								if (pl->inventory[inv].item_id == UINT_MAX) {
+									pl->inventory[inv].item_id = 51;
+									pl->inventory[inv].item_param = 2;
+									bits_shield[name_str] -= bits_per_shield;
+									bits_spent[name_str] += bits_per_shield;
+									buyfeed_add(&bf_rw, pl->name, 51);
+									//printf("bought bandage, spent %i\n", bits_spent[name_str]);
+									break;
+								}
+							}
+						} else if (pap_start[1] == 52) {
+							for (int inv = 0; inv < 6; inv++) {
+								if (pl->inventory[inv].item_id == UINT_MAX) {
+									pl->inventory[inv].item_id = 52;
+									pl->inventory[inv].item_param = 5;
+									bits_bandage[name_str] -= bits_per_bandage;
+									bits_spent[name_str] += bits_per_bandage;
+									buyfeed_add(&bf_rw, pl->name, 52);
+									//printf("bought bandage, spent %i\n", bits_spent[name_str]);
+									break;
 								}
 							}
 						}
