@@ -490,8 +490,6 @@ void launch_draw_entities_kernel(
 void entity_add(string name, enum entity_type et, unsigned int model_id, unsigned int model_z) {
     struct entity e;
     e.et = et;
-    e.force = { 0.0f, 0.0f };
-    e.velocity = { 0.0f, 0.0f };
     for (int i = 0; i < name.length() && i < 50; i++) {
         e.name[i] = name[i];
         e.name_len = i+1;

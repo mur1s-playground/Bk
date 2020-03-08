@@ -69,8 +69,7 @@ void player_add(struct bit_field *bf_rw, string name, enum player_type pt, unsig
             p.inventory[i].item_id = UINT_MAX;
             p.inventory[i].item_param = 0;
         }
-        p.player_stance = PS_WALKING;
-        p.player_action = PA_NONE;
+        p.actions = 0;
         p.entity_id = entity_id;
         players.try_emplace(name, p);
         playerlist_add(bf_rw, name.c_str());
@@ -81,6 +80,16 @@ void player_type_change(string name, enum player_type pt) {
     map<string, struct player>::iterator it = players.find(name);
     if (it != players.end()) {
         it->second.pt = pt;
+    }
+}
+
+void player_action_param_add(struct player* pl, const enum player_action_type pat, const unsigned int param1, const unsigned int param2) {
+    unsigned int* pap_start = &pl->action_params[3 * pl->actions];
+    if (pl->actions < 50 / 3) {
+        pap_start[0] = pat;
+        pap_start[1] = param1;
+        pap_start[2] = param2;
+        pl->actions++;
     }
 }
 

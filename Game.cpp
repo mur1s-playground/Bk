@@ -19,6 +19,8 @@
 #include "AssetLoader.hpp"
 #include "TwitchIntegration.hpp"
 
+unsigned int game_pw_thread_count			= 4;
+HANDLE* game_pw_threads_locks;
 
 atomic<unsigned int>	game_ticks			= 0;
 atomic<unsigned int>	game_ticks_target	= 30;
@@ -83,6 +85,11 @@ DWORD WINAPI game_thread(LPVOID param) {
 
 void game_init() {
 	printf("initialising game\n");
+
+	game_pw_threads_locks = (HANDLE*)malloc(game_pw_thread_count*sizeof(HANDLE*));
+	for (int i = 0; i < game_pw_thread_count; i++) {
+		game_pw_threads_locks[i] = CreateMutex(NULL, FALSE, NULL);
+	}
 
 	//load first map
 	map_load(&bf_assets, ui_textfield_get_value(&bf_rw, "lobby", "selected_map"));
@@ -271,151 +278,207 @@ void game_start() {
 	printf("game start successful\n");
 }
 
-void game_tick() {
-		map<string, struct player>::iterator players_it = players.begin();
-		float player_dist_per_tick = 1 / 5.0f;
-		int orientation_change_per_tick = 3;
-		while (players_it != players.end()) {
-			//struct entity* es = (struct entity*) & bf_rw.data[entities_position];
-			struct player* pl = &players_it->second;
-			if (pl->alive) {
-				if (pl->entity_id < UINT_MAX) {
-					struct entity* es = (struct entity*) & bf_rw.data[entities_position];
-					struct entity* en = (struct entity*) & es[pl->entity_id];
+DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
+	map<string, struct player>::iterator players_it = players.begin();
+	unsigned int offset = (unsigned int)param;
+	for (int i = 0; i < offset; i++) {
+		if (players_it != players.end()) {
+			players_it++;
+		}
+	}
+	float player_dist_per_tick = 1 / 5.0f;
+	int orientation_change_per_tick = 3;
+	while (players_it != players.end()) {
+		//struct entity* es = (struct entity*) & bf_rw.data[entities_position];
+		struct player* pl = &players_it->second;
+		if (pl->alive) {
+			if (pl->entity_id < UINT_MAX) {
+				struct entity* es = (struct entity*) & bf_rw.data[entities_position];
+				struct entity* en = (struct entity*) & es[pl->entity_id];
 
-					//struct entity* en = &es[pl->entity_id];
-					int has_inv_space = 0;
-					int has_gun = -1;
-					for (int inv = 0; inv < 6; inv++) {
-						if (pl->inventory[inv].item_id == UINT_MAX) {
-							has_inv_space++;
-						}
-						else if (pl->inventory[inv].item_id == 50) {
-							has_gun = inv;
-							if (pl->inventory[inv].item_param % 15 != 0) {
-								pl->inventory[inv].item_param++;
-							}
-						}
-						else if (pl->inventory[inv].item_id == 51) {
-							if (pl->shield <= 75 && pl->inventory[inv].item_param != 0) {
-								//printf("shiedling\n");
-								pl->shield += 25;
-								pl->inventory[inv].item_param--;
-							}
-							if (pl->inventory[inv].item_param == 0) {
-								pl->inventory[inv].item_id = UINT_MAX;
-								has_inv_space++;
-							}
-						}
-						else if (pl->inventory[inv].item_id == 52) {
-							if (pl->health <= 75 && pl->inventory[inv].item_param != 0) {
-								//printf("healing\n");
-								pl->health += 25;
-								pl->inventory[inv].item_param--;
-							}
-							if (pl->inventory[inv].item_param == 0) {
-								pl->inventory[inv].item_id = UINT_MAX;
-								has_inv_space++;
-							}
+				//struct entity* en = &es[pl->entity_id];
+				int has_inv_space = 0;
+				int has_gun = -1;
+				for (int inv = 0; inv < 6; inv++) {
+					if (pl->inventory[inv].item_id == UINT_MAX) {
+						has_inv_space++;
+					}
+					else if (pl->inventory[inv].item_id == 50) {
+						has_gun = inv;
+						if (pl->inventory[inv].item_param % 15 != 0) {
+							pl->inventory[inv].item_param++;
 						}
 					}
+					else if (pl->inventory[inv].item_id == 51) {
+						if (pl->shield <= 75 && pl->inventory[inv].item_param != 0) {
+							//printf("shiedling\n");
+							pl->shield += 25;
+							pl->inventory[inv].item_param--;
+						}
+						if (pl->inventory[inv].item_param == 0) {
+							pl->inventory[inv].item_id = UINT_MAX;
+							has_inv_space++;
+						}
+					}
+					else if (pl->inventory[inv].item_id == 52) {
+						if (pl->health <= 75 && pl->inventory[inv].item_param != 0) {
+							//printf("healing\n");
+							pl->health += 25;
+							pl->inventory[inv].item_param--;
+						}
+						if (pl->inventory[inv].item_param == 0) {
+							pl->inventory[inv].item_id = UINT_MAX;
+							has_inv_space++;
+						}
+					}
+				}
 
-					if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-						string name_str(en->name);
-						map<string, int>::iterator bit_it = bits_spent.find(name_str);
-						if (bit_it != bits_spent.end()) {
-							int spent = bit_it->second;
-							if (bits_spent[name_str] < max_bits_per_game) {
-								map<string, int>::iterator bit_it_s = bits_shield.find(name_str);
-								if (bit_it_s != bits_shield.end()) {
-									if (bit_it_s->second >= bits_per_shield) {
+				if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+					string name_str(en->name);
+					map<string, int>::iterator bit_it = bits_spent.find(name_str);
+					if (bit_it != bits_spent.end()) {
+						int spent = bit_it->second;
+						if (bits_spent[name_str] < max_bits_per_game) {
+							map<string, int>::iterator bit_it_s = bits_shield.find(name_str);
+							if (bit_it_s != bits_shield.end()) {
+								if (bit_it_s->second >= bits_per_shield) {
+									for (int inv = 0; inv < 6; inv++) {
+										if (pl->inventory[inv].item_id == UINT_MAX) {
+											pl->inventory[inv].item_id = 51;
+											pl->inventory[inv].item_param = 2;
+											has_inv_space--;
+											bits_shield[name_str] -= bits_per_shield;
+											bits_spent[name_str] += bits_per_shield;
+											buyfeed_add(&bf_rw, en->name, 51);
+											//printf("bought shield, spent %i\n", bits_spent[name_str]);
+											break;
+										}
+									}
+								}
+							}
+						}
+						if (bits_spent[name_str] < max_bits_per_game) {
+							if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+								map<string, int>::iterator bit_it_b = bits_bandage.find(name_str);
+								if (bit_it_b != bits_bandage.end()) {
+									if (bit_it_b->second >= bits_per_bandage) {
 										for (int inv = 0; inv < 6; inv++) {
 											if (pl->inventory[inv].item_id == UINT_MAX) {
-												pl->inventory[inv].item_id = 51;
-												pl->inventory[inv].item_param = 2;
+												pl->inventory[inv].item_id = 52;
+												pl->inventory[inv].item_param = 5;
 												has_inv_space--;
-												bits_shield[name_str] -= bits_per_shield;
-												bits_spent[name_str] += bits_per_shield;
-												buyfeed_add(&bf_rw, en->name, 51);
-												//printf("bought shield, spent %i\n", bits_spent[name_str]);
+												bits_bandage[name_str] -= bits_per_bandage;
+												bits_spent[name_str] += bits_per_bandage;
+												buyfeed_add(&bf_rw, en->name, 52);
+												//printf("bought bandage, spent %i\n", bits_spent[name_str]);
 												break;
 											}
 										}
 									}
 								}
 							}
-							if (bits_spent[name_str] < max_bits_per_game) {
-								if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-									map<string, int>::iterator bit_it_b = bits_bandage.find(name_str);
-									if (bit_it_b != bits_bandage.end()) {
-										if (bit_it_b->second >= bits_per_bandage) {
-											for (int inv = 0; inv < 6; inv++) {
-												if (pl->inventory[inv].item_id == UINT_MAX) {
-													pl->inventory[inv].item_id = 52;
-													pl->inventory[inv].item_param = 5;
-													has_inv_space--;
-													bits_bandage[name_str] -= bits_per_bandage;
-													bits_spent[name_str] += bits_per_bandage;
-													buyfeed_add(&bf_rw, en->name, 52);
-													//printf("bought bandage, spent %i\n", bits_spent[name_str]);
-													break;
-												}
-											}
+						}
+					}
+				}
+
+				//current position
+				int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { en->position[0], en->position[1], 0.0f });
+				if (gi > -1) {
+					int g_data_pos = bf_rw.data[gd.data_position_in_bf + 1 + gi];
+					if (g_data_pos > 0) {
+						int element_count = bf_rw.data[g_data_pos];
+						for (int e = 0; e < element_count; e++) {
+							unsigned int entity_id = bf_rw.data[g_data_pos + 1 + e];
+							if (entity_id != pl->entity_id && entity_id < UINT_MAX) {
+								struct entity* etc = &es[entity_id];
+								if (etc->et == ET_ITEM) {
+									if (etc->model_id == 50) { //colt
+										if (has_gun < 0) {
+											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
+											has_inv_space--;
+										}
+									}
+									else if (etc->model_id == 51) { //shield
+										if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
+											has_inv_space--;
+										}
+									}
+									else if (etc->model_id == 52) { //bandage
+										if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
+											has_inv_space--;
 										}
 									}
 								}
 							}
 						}
 					}
+				}
+				float delta_x = 0.0f;
+				float delta_y = 0.0f;
 
-					//current position
-					int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { en->position[0], en->position[1], 0.0f });
+				if (storm_next_move_time(en->position, player_dist_per_tick) == 1.0f) {
+					float dist = sqrtf((storm_to.x - en->position[0]) * (storm_to.x - en->position[0]) + (storm_to.y - en->position[1]) * (storm_to.y - en->position[1])) + 1e-5;
+
+					delta_x = player_dist_per_tick * ((storm_to.x - en->position[0]) / dist);
+					delta_y = player_dist_per_tick * ((storm_to.y - en->position[1]) / dist);
+				}
+
+				struct vector2<int> spiral_pos = { (int)en->position[0], (int)en->position[1] + 32 };
+				struct vector2<int> spiral_dir[4] = { {0, 32}, { 32, 0 }, { 0, -32 }, { -32, 0 } };
+				int					spiral_dir_idx = 1;
+				struct vector2<int> spiral_dir_current = spiral_dir[spiral_dir_idx];
+				int					spiral_steps_last = 1;
+				int					spiral_steps = 1;
+				int					spiral_steps_counter = 0;
+
+				while (spiral_steps < 10) {
+					//process grid
+					int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { (float)spiral_pos[0], (float)spiral_pos[1], 0.0f });
 					if (gi > -1) {
 						int g_data_pos = bf_rw.data[gd.data_position_in_bf + 1 + gi];
 						if (g_data_pos > 0) {
+							float dist = sqrtf((spiral_pos[0] - (int)en->position[0]) * (spiral_pos[0] - (int)en->position[0]) + (spiral_pos[1] - (int)en->position[1]) * (spiral_pos[1] - (int)en->position[1])) + 1e-5;
 							int element_count = bf_rw.data[g_data_pos];
 							for (int e = 0; e < element_count; e++) {
 								unsigned int entity_id = bf_rw.data[g_data_pos + 1 + e];
 								if (entity_id != pl->entity_id && entity_id < UINT_MAX) {
 									struct entity* etc = &es[entity_id];
-									if (etc->et == ET_ITEM) {
-										if (etc->model_id == 50) { //colt
-											if (has_gun < 0) {
-												for (int inv = 0; inv < 6; inv++) {
-													if (pl->inventory[inv].item_id == UINT_MAX) {
-														//printf("picked up a gun\n");
-														pl->inventory[inv].item_id = 50;
-														pl->inventory[inv].item_param = 5;
-														grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[0].model_scale, item_models[0].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[0]), entity_id);
-														break;
-													}
+									if (etc->et == ET_ITEM && delta_x == 0 && delta_y == 0) {
+										if (!storm_is_in({ (float)spiral_pos[0], (float)spiral_pos[1], 0.0f })) {
+											if (etc->model_id == 50) { //colt
+												if (has_gun < 0) {
+													delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
+													delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
+												}
+											}
+											else if (etc->model_id == 51) { // shield
+												if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+													delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
+													delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
+												}
+											}
+											else if (etc->model_id == 52) { // bandage
+												if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+													delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
+													delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
 												}
 											}
 										}
-										else if (etc->model_id == 51) { //shield
-											if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-												for (int inv = 0; inv < 6; inv++) {
-													if (pl->inventory[inv].item_id == UINT_MAX) {
-														//printf("picked up shield\n");
-														pl->inventory[inv].item_id = 51;
-														pl->inventory[inv].item_param = 2;
-														grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[1].model_scale, item_models[1].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[1]), entity_id);
-														break;
-													}
+									} else if (etc->et == ET_PLAYER && has_gun >= 0) {
+										if (dist / 32 < 5 && pl->inventory[has_gun].item_param % 15 == 0) {
+											if (players[etc->name].health > 0) {
+												pl->inventory[has_gun].item_param++;
+												float hit = (rand() / (float)RAND_MAX);
+												//printf("player: %s shoots at %s", pl->name, etc->name);
+												if (hit < 0.8) {
+													size_t pl_ptr = (size_t)&players[etc->name];
+													unsigned int pl_ptr_1 = ((unsigned int*)&pl_ptr)[0];
+													unsigned int pl_ptr_2 = ((unsigned int*)&pl_ptr)[1];
+													player_action_param_add(pl, PAT_SHOOT_AT, pl_ptr_1, pl_ptr_2);
 												}
-											}
-										}
-										else if (etc->model_id == 52) { //bandage
-											if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-												for (int inv = 0; inv < 6; inv++) {
-													if (pl->inventory[inv].item_id == UINT_MAX) {
-														//printf("picked up bandage\n");
-														pl->inventory[inv].item_id = 52;
-														pl->inventory[inv].item_param = 5;
-														grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[2].model_scale, item_models[2].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[2]), entity_id);
-														break;
-													}
-												}
+												//printf("\n");
 											}
 										}
 									}
@@ -423,171 +486,131 @@ void game_tick() {
 							}
 						}
 					}
-					float delta_x = 0.0f;
-					float delta_y = 0.0f;
+					//spiral_pos_next
+					spiral_pos = { spiral_pos[0] + spiral_dir_current[0], spiral_pos[1] + spiral_dir_current[1] };
+					spiral_steps--;
+					if (spiral_steps == 0) {
+						spiral_steps_counter++;
+						spiral_dir_current = spiral_dir[(spiral_dir_idx + 1) % 4];
+						spiral_dir_idx++;
+						spiral_steps = spiral_steps_last;
+						if (spiral_steps_counter == 2) {
+							spiral_steps++;
+							spiral_steps_counter = 0;
+						}
+						spiral_steps_last = spiral_steps;
+					}
+				}
+				int target_orientation = en->orientation;
+				if (delta_x == 0 && delta_y == 0) {
+					if (rand() / (float)RAND_MAX < 0.1) {
+						int fac = 1;
+						if (rand() / (float)RAND_MAX < 0.20) fac = -1;
+						en->orientation += 3 * fac;
+					}
+					delta_x = -1 * player_dist_per_tick * cos(3.1415 / 180.0f * (en->orientation + 90));
+					delta_y = -1 * player_dist_per_tick * sin(3.1415 / 180.0f * (en->orientation - 90));
 
-					if (storm_next_move_time(en->position, player_dist_per_tick) == 1.0f) {
-						float dist = sqrtf((storm_to.x - en->position[0]) * (storm_to.x - en->position[0]) + (storm_to.y - en->position[1]) * (storm_to.y - en->position[1])) + 1e-5;
-
-						delta_x = player_dist_per_tick * ((storm_to.x - en->position[0]) / dist);
-						delta_y = player_dist_per_tick * ((storm_to.y - en->position[1]) / dist);
+					if (en->position[0] + delta_x < 32) {
+						delta_x = 0.0f;
+						delta_y = 0.0f;
+						target_orientation = 45 + (int)(rand() / (float)RAND_MAX * 90);
+						en->orientation = target_orientation;
+					}
+					if (en->position[0] + delta_x >= gm.map_dimensions[0] - 32) {
+						delta_x = 0.0f;
+						delta_y = 0.0f;
+						target_orientation = 315 - (int)(rand() / (float)RAND_MAX * 90);
+						en->orientation = target_orientation;
+					}
+					if (en->position[1] + delta_y < 32) {
+						delta_x = 0.0f;
+						delta_y = 0.0f;
+						target_orientation = 315 + (int)(rand() / (float)RAND_MAX * 90);
+						en->orientation = target_orientation;
+					}
+					if (en->position[1] + delta_y >= gm.map_dimensions[1] - 32) {
+						delta_x = 0.0f;
+						delta_y = 0.0f;
+						target_orientation = 135 + (int)(rand() / (float)RAND_MAX * 90);
+						en->orientation = target_orientation;
 					}
 
-					struct vector2<int> spiral_pos = { (int)en->position[0], (int)en->position[1] + 32 };
-					struct vector2<int> spiral_dir[4] = { {0, 32}, { 32, 0 }, { 0, -32 }, { -32, 0 } };
-					int					spiral_dir_idx = 1;
-					struct vector2<int> spiral_dir_current = spiral_dir[spiral_dir_idx];
-					int					spiral_steps_last = 1;
-					int					spiral_steps = 1;
-					int					spiral_steps_counter = 0;
-
-					while (spiral_steps < 10) {
-						//process grid
-						int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { (float)spiral_pos[0], (float)spiral_pos[1], 0.0f });
-						if (gi > -1) {
-							int g_data_pos = bf_rw.data[gd.data_position_in_bf + 1 + gi];
-							if (g_data_pos > 0) {
-								float dist = sqrtf((spiral_pos[0] - (int)en->position[0]) * (spiral_pos[0] - (int)en->position[0]) + (spiral_pos[1] - (int)en->position[1]) * (spiral_pos[1] - (int)en->position[1])) + 1e-5;
-								int element_count = bf_rw.data[g_data_pos];
-								for (int e = 0; e < element_count; e++) {
-									unsigned int entity_id = bf_rw.data[g_data_pos + 1 + e];
-									if (entity_id != pl->entity_id && entity_id < UINT_MAX) {
-										struct entity* etc = &es[entity_id];
-										if (etc->et == ET_ITEM && delta_x == 0 && delta_y == 0) {
-											if (!storm_is_in({ (float)spiral_pos[0], (float)spiral_pos[1], 0.0f })) {
-												if (etc->model_id == 50) { //colt
-													if (has_gun < 0) {
-														delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
-														delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
-													}
-												}
-												else if (etc->model_id == 51) { // shield
-													if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-														delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
-														delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
-													}
-												}
-												else if (etc->model_id == 52) { // bandage
-													if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-														delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
-														delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
-													}
-												}
-											}
-										}
-										else if (etc->et == ET_PLAYER && has_gun >= 0) {
-											if (dist / 32 < 5 && pl->inventory[has_gun].item_param % 15 == 0) {
-												if (players[etc->name].health > 0) {
-													pl->inventory[has_gun].item_param++;
-													float hit = (rand() / (float)RAND_MAX);
-													//printf("player: %s shoots at %s", pl->name, etc->name);
-													if (hit < 0.8) {
-														if (players[etc->name].shield > 0) {
-															players[etc->name].shield -= 10;
-														}
-														else {
-															players[etc->name].health -= 10;
-														}
-														pl->damage_dealt += 10;
-														//printf(" hit");
-														if (players[etc->name].health <= 0) {
-															pl->kills++;
-															//printf(" & kill");
-															killfeed_add(&bf_rw, pl->name, players[etc->name].name);
-															leaderboard_add(&bf_rw, players[etc->name].name, players[etc->name].damage_dealt, players[etc->name].kills, pl->name);
-														}
-													}
-													//printf("\n");
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-						//spiral_pos_next
-						spiral_pos = { spiral_pos[0] + spiral_dir_current[0], spiral_pos[1] + spiral_dir_current[1] };
-						spiral_steps--;
-						if (spiral_steps == 0) {
-							spiral_steps_counter++;
-							spiral_dir_current = spiral_dir[(spiral_dir_idx + 1) % 4];
-							spiral_dir_idx++;
-							spiral_steps = spiral_steps_last;
-							if (spiral_steps_counter == 2) {
-								spiral_steps++;
-								spiral_steps_counter = 0;
-							}
-							spiral_steps_last = spiral_steps;
-						}
+					if (storm_is_in({ en->position[0] + delta_x, en->position[1] + delta_y, 0.0f })) {
+						delta_x = 0.0f;
+						delta_y = 0.0f;
+						target_orientation += 3;
 					}
-					int target_orientation = en->orientation;
-					if (delta_x == 0 && delta_y == 0) {
-						if (rand() / (float)RAND_MAX < 0.1) {
-							int fac = 1;
-							if (rand() / (float)RAND_MAX < 0.20) fac = -1;
-							en->orientation += 3 * fac;
-						}
-						delta_x = -1 * player_dist_per_tick * cos(3.1415 / 180.0f * (en->orientation + 90));
-						delta_y = -1 * player_dist_per_tick * sin(3.1415 / 180.0f * (en->orientation - 90));
-
-						if (en->position[0] + delta_x < 32) {
-							delta_x = 0.0f;
-							delta_y = 0.0f;
-							target_orientation = 45 + (int)(rand() / (float)RAND_MAX * 90);
-							en->orientation = target_orientation;
-						}
-						if (en->position[0] + delta_x >= gm.map_dimensions[0] - 32) {
-							delta_x = 0.0f;
-							delta_y = 0.0f;
-							target_orientation = 315 - (int)(rand() / (float)RAND_MAX * 90);
-							en->orientation = target_orientation;
-						}
-						if (en->position[1] + delta_y < 32) {
-							delta_x = 0.0f;
-							delta_y = 0.0f;
-							target_orientation = 315 + (int)(rand() / (float)RAND_MAX * 90);
-							en->orientation = target_orientation;
-						}
-						if (en->position[1] + delta_y >= gm.map_dimensions[1] - 32) {
-							delta_x = 0.0f;
-							delta_y = 0.0f;
-							target_orientation = 135 + (int)(rand() / (float)RAND_MAX * 90);
-							en->orientation = target_orientation;
-						}
-
-						if (storm_is_in({ en->position[0] + delta_x, en->position[1] + delta_y, 0.0f })) {
-							delta_x = 0.0f;
-							delta_y = 0.0f;
-							target_orientation += 3;
-						}
-					}
-					else {
-						target_orientation = (int)roundf(atan2(-delta_y, delta_x) * (180 / 3.1415f)) + 90;
-					}
-					if (target_orientation < 0) {
-						target_orientation += 360;
-					}
-					if (abs(((int)en->orientation - target_orientation) % 360) > orientation_change_per_tick) {
-						if (target_orientation > en->orientation) {
-							if (abs(en->orientation + 360 - target_orientation) < abs(target_orientation - en->orientation)) {
-								en->orientation -= orientation_change_per_tick;
-							}
-							else {
-								en->orientation += orientation_change_per_tick;
-							}
+				}
+				else {
+					target_orientation = (int)roundf(atan2(-delta_y, delta_x) * (180 / 3.1415f)) + 90;
+				}
+				if (target_orientation < 0) {
+					target_orientation += 360;
+				}
+				if (abs(((int)en->orientation - target_orientation) % 360) > orientation_change_per_tick) {
+					if (target_orientation > en->orientation) {
+						if (abs(en->orientation + 360 - target_orientation) < abs(target_orientation - en->orientation)) {
+							en->orientation -= orientation_change_per_tick;
 						}
 						else {
-							if (abs(en->orientation - (target_orientation + 360)) < abs(en->orientation - target_orientation)) {
-								en->orientation += orientation_change_per_tick;
-							}
-							else {
-								en->orientation -= orientation_change_per_tick;
-							}
+							en->orientation += orientation_change_per_tick;
 						}
-						if (en->orientation < 0) en->orientation += 360;
 					}
 					else {
-						en->orientation = target_orientation;
+						if (abs(en->orientation - (target_orientation + 360)) < abs(en->orientation - target_orientation)) {
+							en->orientation += orientation_change_per_tick;
+						}
+						else {
+							en->orientation -= orientation_change_per_tick;
+						}
+					}
+					if (en->orientation < 0) en->orientation += 360;
+				} else {
+					en->orientation = target_orientation;
+					unsigned int delta_x_i = *((unsigned int*)&delta_x);
+					unsigned int delta_y_i = *((unsigned int*)&delta_y);
+					player_action_param_add(&players_it->second, PAT_MOVE, delta_x_i, delta_y_i);
+				}
+				en->params[0] = (char)players_it->second.health;
+				en->params[1] = (char)players_it->second.shield;
+				int* params = (int*)&en->params;
+				int params_pos = 1;
+				for (int ip = 0; ip < 6; ip++) {
+					params[params_pos++] = players_it->second.inventory[ip].item_id;
+					params[params_pos++] = players_it->second.inventory[ip].item_param;
+				}
+			}
+		}
+		int steps = game_pw_thread_count;
+		while (steps > 0 && players_it != players.end()) {
+			players_it++;
+			steps--;
+		}
+	}
+	return NULL;
+}
+
+void game_tick() {
+	HANDLE game_wthreads[4];
+	int game_wthreads_params[4];
+	for (int i = 0; i < game_pw_thread_count; i++) {
+		game_wthreads_params[i] = i;
+		game_wthreads[i] = CreateThread(NULL, 0, game_playerperception_worker_thread, (LPVOID)game_wthreads_params[i], 0, NULL);
+	}
+
+	WaitForMultipleObjects(4, game_wthreads, TRUE, INFINITE);
+	
+		map<string, struct player>::iterator players_it = players.begin();
+		//players_it = players.begin();
+		struct entity* es = (struct entity*) & bf_rw.data[entities_position];
+		while (players_it != players.end()) {
+			struct player* pl = &players_it->second;
+			for (int ac = 0; ac < pl->actions; ac++) {
+				unsigned int* pap_start = &pl->action_params[3 * ac];
+				if (pap_start[0] == PAT_MOVE) {
+					if (pl->entity_id < UINT_MAX) {
+						struct entity* en = (struct entity*) & es[pl->entity_id];
 						//object itself
 						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
 						//object text
@@ -595,23 +618,11 @@ void game_tick() {
 						//object inventory
 						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, pl->entity_id);
 
-						en->force[0] = delta_x;
-						en->force[1] = delta_y;
+						float delta_x = *((float*)&pap_start[1]);
+						float delta_y = *((float*)&pap_start[2]);
 
-						float val_1 = exp(1 / (pow(en->force[0] - en->velocity[0], 2.0) + 1)) / exp(1);
-						float val_1b = 1 - val_1;
-
-						float val_2 = exp(1 / (pow(en->force[1] - en->velocity[1], 2.0) + 1)) / exp(1);
-						float val_2b = 1 - val_2;
-
-						float a = en->velocity[0] * val_1b + en->force[0] * val_1;
-						float b = en->velocity[1] * val_2b + en->force[1] * val_2;
-
-						en->velocity[0] = (a);
-						en->velocity[1] = (b);
-
-						en->position[0] += en->velocity[0];
-						en->position[1] += en->velocity[1];
+						en->position[0] += delta_x;
+						en->position[1] += delta_y;
 
 						//object itself
 						grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
@@ -626,22 +637,95 @@ void game_tick() {
 						es = (struct entity*) & bf_rw.data[entities_position];
 						en = (struct entity*) & es[pl->entity_id];
 					}
-					en->params[0] = (char)players_it->second.health;
-					en->params[1] = (char)players_it->second.shield;
-					int* params = (int*)&en->params;
-					int params_pos = 1;
-					for (int ip = 0; ip < 6; ip++) {
-						params[params_pos++] = players_it->second.inventory[ip].item_id;
-						params[params_pos++] = players_it->second.inventory[ip].item_param;
+				} else if (pap_start[0] == PAT_SHOOT_AT) {
+					unsigned int pl_ptr_1 = pap_start[1];
+					unsigned int pl_ptr_2 = pap_start[2];
+					size_t pl_ptr;
+					unsigned int* pl_ptr_ = (unsigned int*)&pl_ptr;
+					pl_ptr_[0] = pl_ptr_1;
+					pl_ptr_[1] = pl_ptr_2;
+					struct player* pl_target = (struct player*) pl_ptr;
+					if (pl_target->health > 0) {
+						if (pl_target->shield > 0) {
+							pl_target->shield -= 10;
+						}
+						else {
+							pl_target->health -= 10;
+						}
+						pl->damage_dealt += 10;
+						//printf(" hit");
+						if (pl_target->health <= 0) {
+							pl_target->alive = false;
+							struct entity* target_entity = &es[pl_target->entity_id];
+							//object itself
+							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, target_entity->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl_target->entity_id);
+							//object text
+							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { target_entity->position[0] - 32.0f - 3, target_entity->position[1] - 32.0f - 3, target_entity->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { target_entity->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl_target->entity_id);
+							//object inventory
+							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { target_entity->position[0] - 32.0f - 3, target_entity->position[1], target_entity->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, pl_target->entity_id);
+							pl_target->entity_id = UINT_MAX;
+
+							pl->kills++;
+							//printf(" & kill");
+							killfeed_add(&bf_rw, pl->name, pl_target->name);
+							leaderboard_add(&bf_rw, pl_target->name, pl_target->damage_dealt, pl_target->kills, pl->name);
+						}
+					}
+				} else if (pap_start[0] == PAT_PICKUP_ITEM) {
+					if (pl->entity_id < UINT_MAX) {
+						struct entity* en = (struct entity*) & es[pl->entity_id];
+						struct entity* etc = &es[pap_start[1]];
+						//printf("trying to pickup item\n");
+						int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { en->position[0], en->position[1], 0.0f });
+						if (gi > -1) {
+							int g_data_pos = bf_rw.data[gd.data_position_in_bf + 1 + gi];
+							if (g_data_pos > 0) {
+								int element_count = bf_rw.data[g_data_pos];
+								for (int e = 0; e < element_count; e++) {
+									unsigned int item_entity_id = bf_rw.data[g_data_pos + 1 + e];
+									if (item_entity_id == pap_start[1]) {
+										if (etc->model_id == 50) { //colt
+											for (int inv = 0; inv < 6; inv++) {
+												if (pl->inventory[inv].item_id == UINT_MAX) {
+													//printf("picked up a gun\n");
+													pl->inventory[inv].item_id = 50;
+													pl->inventory[inv].item_param = 5;
+													grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[0].model_scale, item_models[0].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[0]), item_entity_id);
+													break;
+												}
+											}
+										}
+										else if (etc->model_id == 51) { //shield
+											for (int inv = 0; inv < 6; inv++) {
+												if (pl->inventory[inv].item_id == UINT_MAX) {
+													//printf("picked up shield\n");
+													pl->inventory[inv].item_id = 51;
+													pl->inventory[inv].item_param = 2;
+													grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[1].model_scale, item_models[1].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[1]), item_entity_id);
+													break;
+												}
+											}
+										}
+										else if (etc->model_id == 52) { //bandage
+											for (int inv = 0; inv < 6; inv++) {
+												if (pl->inventory[inv].item_id == UINT_MAX) {
+													//printf("picked up bandage\n");
+													pl->inventory[inv].item_id = 52;
+													pl->inventory[inv].item_param = 5;
+													grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[2].model_scale, item_models[2].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[2]), item_entity_id);
+													break;
+												}
+											}
+										}
+										break;
+									}
+								}
+							}
+						}
 					}
 				}
 			}
-			players_it++;
-		}
-		players_it = players.begin();
-		struct entity* es = (struct entity*) & bf_rw.data[entities_position];
-		while (players_it != players.end()) {
-			struct player* pl = &players_it->second;
+			pl->actions = 0;
 			if (pl->kills > top_kills) {
 				ui_textfield_set_value(&bf_rw, "ingame_menu", "top_kills", pl->name);
 				ui_textfield_set_int(&bf_rw, "ingame_menu", "top_kills_nr", pl->kills);
@@ -651,19 +735,6 @@ void game_tick() {
 				ui_textfield_set_value(&bf_rw, "ingame_menu", "top_damage", pl->name);
 				ui_textfield_set_int(&bf_rw, "ingame_menu", "top_damage_nr", pl->damage_dealt);
 				top_damage = pl->damage_dealt;
-			}
-			if (pl->alive) {
-				if (pl->health <= 0) {
-					struct entity* en = &es[pl->entity_id];
-					pl->alive = false;
-					//object itself
-					grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
-					//object text
-					grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
-					//object inventory
-					grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, pl->entity_id);
-					pl->entity_id = UINT_MAX;
-				}
 			}
 			players_it++;
 		}

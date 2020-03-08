@@ -25,6 +25,93 @@ int                         ui_active_id = -1;
 map<string, unsigned int>   ui_elements_position;
 unsigned int		    	ui_fonts_position = 0;
 
+__forceinline__
+__device__ float getInterpixel(const unsigned char* frame, const unsigned int width, const unsigned int height, const unsigned int channels, float x, float y, const int c) {
+    int x_i = (int)x;
+    int y_i = (int)y;
+    x -= x_i;
+    y -= y_i;
+
+    unsigned char value_components[4];
+    value_components[0] = frame[y_i * (width * channels) + x_i * channels + c];
+    if (x > 0) {
+        if (x_i + 1 < width) {
+            value_components[1] = frame[y_i * (width * channels) + (x_i + 1) * channels + c];
+        }
+        else {
+            x = 0.0f;
+        }
+    }
+    if (y > 0) {
+        if (y_i + 1 < height) {
+            value_components[2] = frame[(y_i + 1) * (width * channels) + x_i * channels + c];
+            if (x > 0) {
+                value_components[3] = frame[(y_i + 1) * (width * channels) + (x_i + 1) * channels + c];
+            }
+        }
+        else {
+            y = 0.0f;
+        }
+    }
+
+    float m_0 = 4.0f / 16.0f;
+    float m_1 = 4.0f / 16.0f;
+    float m_2 = 4.0f / 16.0f;
+    float m_3 = 4.0f / 16.0f;
+    float tmp, tmp2;
+    if (x <= 0.5f) {
+        tmp = ((0.5f - x) / 0.5f) * m_1;
+        m_0 += tmp;
+        m_1 -= tmp;
+        m_2 += tmp;
+        m_3 -= tmp;
+    }
+    else {
+        tmp = ((x - 0.5f) / 0.5f) * m_0;
+        m_0 -= tmp;
+        m_1 += tmp;
+        m_2 -= tmp;
+        m_3 += tmp;
+    }
+    if (y <= 0.5f) {
+        tmp = ((0.5f - y) / 0.5f) * m_2;
+        tmp2 = ((0.5f - y) / 0.5f) * m_3;
+        m_0 += tmp;
+        m_1 += tmp2;
+        m_2 -= tmp;
+        m_3 -= tmp2;
+    }
+    else {
+        tmp = ((y - 0.5f) / 0.5f) * m_0;
+        tmp2 = ((y - 0.5f) / 0.5f) * m_1;
+        m_0 -= tmp;
+        m_1 -= tmp2;
+        m_2 += tmp;
+        m_3 += tmp2;
+    }
+    float value = m_0 * value_components[0] + m_1 * value_components[1] + m_2 * value_components[2] + m_3 * value_components[3];
+    return value;
+}
+
+__forceinline__
+__device__ void sampling(const unsigned char* frame, const unsigned int width, const unsigned int height, float x, float y, const float alpha_threshold, const float sampling_fac, const unsigned int sampling_filter_dim, unsigned char* target_frame, const unsigned int target_width, const unsigned int target_x, const unsigned int target_y) {
+    for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
+        for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
+            float src_s_x = x * sampling_fac + s_x;
+            float src_s_y = y * sampling_fac + s_y;
+            if (src_s_x >= 0 && src_s_x < width && src_s_y >= 0 && src_s_y < height) {
+                float interpixel_alpha = getInterpixel(frame, width, height, 4, src_s_x, src_s_y, 3);
+                if (interpixel_alpha > alpha_threshold) {
+                    for (int c = 0; c < 3; c++) {
+                        float interpixel = getInterpixel(frame, width, height, 4, src_s_x, src_s_y, c);
+                        target_frame[target_y * (target_width * 4) + target_x * 4 + c] = (unsigned char)(((255 - interpixel_alpha) / 255.0f * target_frame[target_y * (target_width * 4) + target_x * 4 + c] + (interpixel_alpha / 255.0f) * interpixel));
+                    }
+                }
+            }
+        }
+    }
+}
+
 __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigned int background_position, const unsigned int fonts_position, unsigned int* bf_output_data, const unsigned int output_position, const unsigned int width, const unsigned int height, const unsigned int channels, const unsigned int *bf_rw_data, const unsigned int ui_elements_position, const unsigned int tick_counter) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -57,33 +144,65 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                     }
                     int fsize = uie->font_size;
                     int fsize_fac = 32 / fsize;
-                    if (current_x >= uie->x1y1[0] && current_x < uie->x1y1[0]+fsize*name_len && current_x < uie->x2y2[0] && current_y >= uie->x1y1[1] && current_y < uie->x1y1[1]+fsize) {
+                    if (current_x >= uie->x1y1[0] && current_x < uie->x1y1[0] + fsize * name_len && current_x < uie->x2y2[0] && current_y >= uie->x1y1[1] && current_y < uie->x1y1[1] + fsize) {
                         int letter_idx = (current_x - uie->x1y1[0]) / fsize;
                         int letter_x = (current_x - uie->x1y1[0]) % fsize;
                         int letter_y = (current_y - uie->x1y1[1]) % fsize;
                         if (uie->value[letter_idx] != '\0') {
                             unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)uie->value[letter_idx] - 48];
-                            unsigned char* letter_frame = (unsigned char *)&bf_assets_data[letter_frame_pos];
-                            float alpha = letter_frame[(letter_y) * fsize_fac * (32 * 4) + (letter_x*fsize_fac) * 4 + 3];
+                            unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
+                            float alpha = letter_frame[(letter_y)*fsize_fac * (32 * 4) + (letter_x * fsize_fac) * 4 + 3];
                             if (alpha > 0) {
                                 for (int c = 0; c < channels - 1; c++) {
-                                    target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[(letter_y) * fsize_fac * (32 * 4) + letter_x *fsize_fac* 4 + c]);
+                                    target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[(letter_y)*fsize_fac * (32 * 4) + letter_x * fsize_fac * 4 + c]);
                                 }
                             }
                         }
                     }
+                    /*
+                    float fsize_fac = 32 / (float)fsize;
+                    if (current_x >= uie->x1y1[0] && current_x < uie->x1y1[0]+fsize*name_len && current_x < uie->x2y2[0] && current_y >= uie->x1y1[1] && current_y < uie->x1y1[1]+fsize) {
+                        int letter_idx = (current_x - uie->x1y1[0]) / fsize;
+                        float letter_x = current_x - uie->x1y1[0] - (letter_idx*fsize);
+                        float letter_y = (current_y - uie->x1y1[1]) * fsize_fac;
+                        if (uie->value[letter_idx] != '\0') {
+
+                            int sampling_filter_dim = (int)ceilf(fsize_fac);
+
+                            unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)uie->value[letter_idx] - 48];
+                            unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
+
+                            for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
+                                for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
+                                    float letter_s_x = letter_x*fsize_fac + s_x;
+                                    float letter_s_y = letter_y*fsize_fac + s_y;
+                                    if (letter_s_x >= 0 && letter_s_x < 32 && letter_s_y >= 0 && letter_s_y < 32) {
+                                        float interpixel_alpha = getInterpixel(letter_frame, 32, 32, 4, letter_s_x, letter_s_y, 3);
+                                        if (interpixel_alpha > 25) {
+                                            for (int c = 0; c < channels - 1; c++) {
+                                                float interpixel = getInterpixel(letter_frame, 32, 32, 4, letter_s_x, letter_s_y, c);
+                                                target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)(((255 - interpixel_alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (interpixel_alpha / 255.0f) * interpixel));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    */
                 } else if (uie->uet == UET_SCROLLLIST) {
                     if (current_x >= uie->x1y1[0] && current_x < uie->x2y2[0] && current_y >= uie->x1y1[1] && current_y < uie->x2y2[1]) {
                         int* config = (int*)&uie->value[0];
 
-                        int content_position    = config[0];
-                        int content_lines       = config[1];
-                        int content_line_length = config[2];
-                        int content_order       = config[3];
-                        int content_align       = config[4];
-                        int content_scroll_pos  = config[5];
-                        //sgroup = config[6]
-                        int content_fsize       = config[7];
+                        int content_position        = config[0];
+                        int content_lines           = config[1];
+                        int content_line_length     = config[2];
+                        int content_order           = config[3];
+                        int content_align           = config[4];
+                        int content_scroll_pos      = config[5];
+                        //sgroup                    = config[6]
+                        int content_fsize           = config[7];
+                        unsigned char* content_fcol = (unsigned char *)&config[8];
 
                         unsigned char* kfes = (unsigned char *)&bf_rw_data[content_position];
                         //int line_count = (bf_rw_data[content_position - 1] * sizeof(unsigned int)) / content_line_length;
@@ -130,30 +249,30 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                             int fontsize_fac = 32 / content_fsize;
                             if (letter_y > 0 && letter_y < content_fsize+1) {
                                 if (letter_idx < text_len && letter_idx >= 0) {
-                                    if (text_len > letter_idx_max || content_align == 0) {
-                                        int letter_idx_cur = letter_idx;
-                                        if (current_kfe[letter_idx] != '\0') {
-                                            unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[letter_idx_cur] - 48];
-                                            unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
-                                            float alpha = letter_frame[((letter_y - 1) * fontsize_fac) * (32 * 4) + (letter_x * fontsize_fac) * 4 + 3];
-                                            if (alpha > 0) {
-                                                for (int c = 0; c < channels - 1; c++) {
-                                                    target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[((letter_y - 1) * fontsize_fac) * (32 * 4) + (letter_x * fontsize_fac) * 4 + c]);
+                                    if (current_kfe[letter_idx] != '\0') {
+                                        unsigned int letter_frame_pos;
+                                        if (text_len > letter_idx_max || content_align == 0) {
+                                            letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[letter_idx] - 48];
+                                        } else {
+                                            letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[text_len - 1 - letter_idx] - 48];
+                                        }
+                                        unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
+
+                                        //int sampling_filter_dim = (int)ceilf(fontsize_fac);
+                                        //sampling(letter_frame, 32, 32, letter_x, letter_y - 1, 25, fontsize_fac, sampling_filter_dim, target_frame, width, current_x, current_y);
+                                            
+                                        float alpha = letter_frame[((letter_y - 1) * fontsize_fac) * (32 * 4) + (letter_x * fontsize_fac) * 4 + 3];
+                                        if (alpha > 0) {
+                                            for (int c = 0; c < channels - 1; c++) {
+                                                unsigned char col;
+                                                if (content_fcol[c] == 0) {
+                                                    col = letter_frame[((letter_y - 1) * fontsize_fac) * (32 * 4) + (letter_x * fontsize_fac) * 4 + c];
+                                                } else {
+                                                    col = content_fcol[c];
                                                 }
+                                                target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * col);
                                             }
                                         }
-                                    } else {
-                                            if (current_kfe[letter_idx] != '\0') {
-                                                unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[text_len - 1 - letter_idx] - 48];
-                                                //unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[text_len - 1 - letter_idx_cur] - 48];
-                                                unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
-                                                float alpha = letter_frame[((letter_y - 1) * fontsize_fac) * (32 * 4) + (letter_x * fontsize_fac) * 4 + 3];
-                                                if (alpha > 0) {
-                                                    for (int c = 0; c < channels - 1; c++) {
-                                                        target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[((letter_y - 1) * fontsize_fac) * (32 * 4) + (letter_x * fontsize_fac) * 4 + c]);
-                                                    }
-                                                }
-                                            }
                                     }
                                 }
                             }
@@ -188,15 +307,14 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                                     image_scale = space_height / (float)image_height;
                                 }
                             }
-                            int image_source_x = (int)roundf((current_x - uie->x1y1[0])/image_scale);
-                            int image_source_y = (int)roundf((current_y - uie->x1y1[1])/image_scale);
+                            unsigned char* src_frame = (unsigned char*)&bf_assets_data[image_position];
 
-                            if (image_source_x < image_width && image_source_y < image_height) {
-                                unsigned char* src_frame = (unsigned char*)&bf_assets_data[image_position];
-                                for (int c = 0; c < channels - 1; c++) {
-                                    target_frame[current_y * (width * channels) + current_x * channels + c] = src_frame[image_source_y * (image_width * 4) + image_source_x * 4 + c];
-                                }
-                            }
+                            float image_source_x = current_x - uie->x1y1[0];
+                            float image_source_y = current_y - uie->x1y1[1];
+
+                            int sampling_filter_dim = (int)ceilf(1.0f/image_scale);
+
+                            sampling(src_frame, image_width, image_height, image_source_x, image_source_y, 25, 1.0f/image_scale, sampling_filter_dim, target_frame, width, current_x, current_y);
                         }
                     }
                 }
@@ -394,6 +512,22 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
                         string first = kv_pairs[i + 7].second;
                         first = trim(first);
                         config[7] = stoi(first);
+                    }
+                    if (kv_pairs[i + 8].first == kv_pairs[i].second + "_fcol") {
+                        size_t sep = kv_pairs[i + 8].second.find_first_of(",");
+                        size_t sep_2 = kv_pairs[i + 8].second.find_last_of(",");
+                        if (sep != string::npos && sep_2 != string::npos) {
+                            string first = kv_pairs[i + 8].second.substr(0, sep);
+                            first = trim(first);
+                            string second = kv_pairs[i + 8].second.substr(sep + 1, sep_2-sep-1);
+                            second = trim(second);
+                            string third = kv_pairs[i + 8].second.substr(sep_2 + 1);
+                            third = trim(third);
+                            unsigned char* col = (unsigned char *)&config[8];
+                            col[0] = stoi(first);
+                            col[1] = stoi(second);
+                            col[2] = stoi(third);
+                        }
                     }
                     config[5] = 0;
                     printf("adding scrolllist %s %i %i\n", t.name.c_str(), config[1], config[2]);
