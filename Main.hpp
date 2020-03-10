@@ -15,7 +15,6 @@ extern struct bit_field bf_assets;
 extern struct bit_field bf_rw;
 extern struct bit_field bf_output;
 
-extern struct vector3<float> camera;
 extern struct vector2<unsigned int> resolution;
 
 extern bool irc_started;
@@ -31,6 +30,6 @@ extern map<string, int>				bits_bandage;
 extern int top_kills;
 extern int top_damage;
 
-extern vector<unsigned int> camera_crop;
+extern struct vector2<unsigned int> mouse_position;
 
 #endif

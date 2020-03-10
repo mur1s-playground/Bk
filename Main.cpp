@@ -40,7 +40,6 @@ struct bit_field bf_assets;
 struct bit_field bf_rw;
 struct bit_field bf_output;
 
-struct vector3<float> camera;
 struct vector2<unsigned int> resolution;
 
 struct vector2<unsigned int> map_dimensions;
@@ -61,7 +60,7 @@ bool running = true;
 int top_kills = 0;
 int top_damage = 0;
 
-vector<unsigned int> camera_crop;
+struct vector2<unsigned int> mouse_position;
 
 int main(int argc, char** argv) {
 	resolution = {1920, 1080};
@@ -136,17 +135,7 @@ int main(int argc, char** argv) {
 	output_position = bit_field_add_bulk_zero(&bf_output, output_size_in_bf)+1;
 	bit_field_register_device(&bf_output, 0);
 
-	camera_crop.push_back(0);
-	camera_crop.push_back(0);
-	camera_crop.push_back(0);
-	camera_crop.push_back(0);
-
-	vector<unsigned int> camera_crop_tmp;
-	camera_crop_tmp.push_back(0);
-	camera_crop_tmp.push_back(0);
-	camera_crop_tmp.push_back(0);
-	camera_crop_tmp.push_back(0);
-	struct vector2<unsigned int> mouse_position;
+	camera_init();
 
 	sdl_show_window();
 	SDL_Event sdl_event;
@@ -173,17 +162,7 @@ int main(int argc, char** argv) {
 				if (sdl_event.type == SDL_MOUSEWHEEL) {
 					if (!ui_process_scroll(&bf_rw, mouse_position[0], mouse_position[1], sdl_event.wheel.y)) {
 						camera_delta_z -= sdl_event.wheel.y * sensitivity_z;
-						bool camera_z_has_moved = false;
-						float camera_z = camera[2];
-						camera_crop_tmp = camera_crop;
 						camera_move(struct vector3<float>(0.0f, 0.0f, camera_delta_z));
-						camera_get_crop(camera_crop);
-						if (camera_z != camera[2]) {
-							camera_move(struct vector3<float>(camera_crop_tmp[0] - camera_crop[0] + mouse_position[0] * (camera_z - camera[2]), 0.0f, 0.0f));
-							camera_get_crop(camera_crop);
-							camera_move(struct vector3<float>(0.0f, camera_crop_tmp[2] - camera_crop[2] + mouse_position[1] * (camera_z - camera[2]), 0.0f));
-							camera_get_crop(camera_crop);
-						}
 					}
 				}
 
@@ -235,6 +214,8 @@ int main(int argc, char** argv) {
 		WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
 		bit_field_update_device(&bf_rw, 0);
 		if (game_started) {
+			camera_move_z_tick();
+			camera_get_crop(camera_crop);
 			launch_draw_map(bf_assets.device_data[0], gm.map_zoom_level_count, gm.map_zoom_center_z, gm.map_zoom_level_offsets_position, gm.map_positions, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
 			launch_draw_entities_kernel(bf_assets.device_data[0], player_models_position, item_models_position, map_models_position, ui_fonts_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
 				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], mouse_position, game_ticks);
