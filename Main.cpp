@@ -18,6 +18,7 @@
 #include "Leaderboard.hpp"
 #include "Util.hpp"
 #include "Game.hpp"
+#include "MapEditor.hpp"
 
 
 #include "time.h"
@@ -53,6 +54,8 @@ map<string, int>				bits_bandage;
 
 int ui_ticks_per_second = 60;
 unsigned int ui_tick_counter = 0;
+
+bool map_editor = false;
 
 bool irc_started = false;
 bool running = true;
@@ -147,15 +150,35 @@ int main(int argc, char** argv) {
 	int frame_balancing = (int)floorf(1000.0f/(float)ui_ticks_per_second);
 	long tf = clock();
 
-	HANDLE game_thread_ = CreateThread(NULL, 0, game_thread, NULL, 0, NULL);
+	if (argc == 3) {
+		if (string(argv[1]) == "--editor") {
+			map_editor = true;
+			ui_textfield_set_value(&bf_rw, "lobby", "selected_map", argv[2]);
+			char orientation[2] = { '0' , '\0' };
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_orientation", orientation);
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_animationoffset", orientation);
+			char scale[4] = {'1', '.', '0', '\0' };
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_scale", scale);
+			printf("map_to_edit: %s\n", argv[2]);
+			mapeditor_init();
+			ui_set_active("mapeditor_overlay");
+			HANDLE game_thread_ = CreateThread(NULL, 0, mapeditor_thread, NULL, 0, NULL);
+		}
+	} else {
+		HANDLE game_thread_ = CreateThread(NULL, 0, game_thread, NULL, 0, NULL);
+	}
 
 	while (running) {
 		long tf_l = clock();
 
 		while (SDL_PollEvent(&sdl_event) != 0) {
-			if (game_started) {
+			if (game_started || map_editor) {
 				if (sdl_event.type == SDL_KEYDOWN && sdl_event.key.keysym.sym == SDLK_ESCAPE) {
-					ui_set_active("ingame_menu");
+					if (map_editor) {
+						ui_set_active("mapeditor_menu");
+					} else {
+						ui_set_active("ingame_menu");
+					}
 				}
 
 				float camera_delta_z = 0.0f;
@@ -205,6 +228,13 @@ int main(int argc, char** argv) {
 								}
 							}
 						}
+					} else {
+						if (map_editor && ui_active == "mapeditor_overlay") {
+							printf("placing object\n");
+							WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
+							mapeditor_place_object();
+							ReleaseMutex(bf_rw.device_locks[0]);
+						}
 					}
 				}
 			}
@@ -213,18 +243,19 @@ int main(int argc, char** argv) {
 		WaitForSingleObject(bf_assets.device_locks[0], INFINITE);
 		WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
 		bit_field_update_device(&bf_rw, 0);
-		if (game_started) {
+		if (game_started || map_editor) {
 			camera_move_z_tick();
 			camera_get_crop(camera_crop);
 			launch_draw_map(bf_assets.device_data[0], gm.map_zoom_level_count, gm.map_zoom_center_z, gm.map_zoom_level_offsets_position, gm.map_positions, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
 			launch_draw_entities_kernel(bf_assets.device_data[0], player_models_position, item_models_position, map_models_position, ui_fonts_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
 				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], mouse_position, game_ticks);
-			launch_draw_storm_kernel(bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[2], camera[2], storm_current, storm_to, 50, { 45, 0, 100 });
+			if (!map_editor) {
+				launch_draw_storm_kernel(bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[2], camera[2], storm_current, storm_to, 50, { 45, 0, 100 });
+			}
 		}
 
 		if (ui_active != "") {
 			launch_draw_ui_kernel(bf_assets.device_data[0], uis[ui_active].background_position, ui_fonts_position, bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, bf_rw.device_data[0], ui_tick_counter);
-
 		}
 		ReleaseMutex(bf_rw.device_locks[0]);
 		ReleaseMutex(bf_assets.device_locks[0]);

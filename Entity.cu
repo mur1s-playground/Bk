@@ -163,16 +163,16 @@ __global__ void draw_entities_kernel(
                             int upscale = 1;
                             float upscale_fac = 1.0f;
                             unsigned int shadow_position = shadows_positions[upscale - 1];
-                            while (camera_z / (m->shadow_scale / upscale_fac) < 2 && upscale - 1 < m->shadow_zoom_level_count - 1) {
+                            while (camera_z / ((m->shadow_scale * entities[entity_id].scale) / upscale_fac) < 2 && upscale - 1 < m->shadow_zoom_level_count - 1) {
                                 upscale++;
                                 shadow_position = shadows_positions[upscale - 1];
                                 upscale_fac *= 2.0f;
                             }
 
-                            sampling_filter_dim = ceilf(camera_z / (m->shadow_scale / upscale_fac));
+                            sampling_filter_dim = ceilf(camera_z / ((m->shadow_scale * entities[entity_id].scale) / upscale_fac));
 
-                            float offset_to_model_shadow_base_x = (current_game_x - (entities[entity_id].position[0] + m->shadow_offset[0])) / (m->shadow_scale / upscale_fac);
-                            float offset_to_model_shadow_base_y = (current_game_y - (entities[entity_id].position[1] + m->shadow_offset[1])) / (m->shadow_scale / upscale_fac);
+                            float offset_to_model_shadow_base_x = (current_game_x - (entities[entity_id].position[0] + (m->shadow_offset[0] * entities[entity_id].scale))) / ((m->shadow_scale * entities[entity_id].scale) / upscale_fac);
+                            float offset_to_model_shadow_base_y = (current_game_y - (entities[entity_id].position[1] + (m->shadow_offset[1] * entities[entity_id].scale))) / ((m->shadow_scale * entities[entity_id].scale) / upscale_fac);
 
                             if (offset_to_model_shadow_base_x >= 1 && offset_to_model_shadow_base_x < m->shadow_dimensions[0] * upscale_fac - 1 &&
                                 offset_to_model_shadow_base_y >= 1 && offset_to_model_shadow_base_y < m->shadow_dimensions[1] * upscale_fac - 1) {
@@ -184,7 +184,7 @@ __global__ void draw_entities_kernel(
                                 */
 
                                 unsigned int* p_shadow_positions = (unsigned int*)&device_data_assets[shadow_position];
-                                unsigned char* p_shadow = (unsigned char*)&device_data_assets[p_shadow_positions[(int)(entities[entity_id].orientation / 10) % 36]];
+                                unsigned char* p_shadow = (unsigned char*)&device_data_assets[p_shadow_positions[((int)(entities[entity_id].orientation / 10) % 36)*m->shadow_animation_ticks + (((tick_counter + entities[entity_id].model_animation_offset) / m->shadow_animation_stepsize) % m->shadow_animation_ticks)]];
 
                                 //enum player_stance p_stance = players[p].player_stance;
                                 //enum player_action p_action = players[p].player_action;
@@ -230,16 +230,16 @@ __global__ void draw_entities_kernel(
                             int upscale = 1;
                             float upscale_fac = 1.0f;
                             unsigned int model_position = model_positions[upscale - 1];
-                            while (camera_z / (m->model_scale / upscale_fac) < 2 && upscale - 1 < m->model_zoom_level_count - 1) {
+                            while (camera_z / ((m->model_scale * entities[entity_id].scale)/ upscale_fac) < 2 && upscale - 1 < m->model_zoom_level_count - 1) {
                                 upscale++;
                                 model_position = model_positions[upscale - 1];
                                 upscale_fac *= 2.0f;
                             }
 
-                            sampling_filter_dim = ceilf(camera_z / (m->model_scale / upscale_fac));
+                            sampling_filter_dim = ceilf(camera_z / ((m->model_scale * entities[entity_id].scale) / upscale_fac));
 
-                            float offset_to_model_base_x = (current_game_x - (entities[entity_id].position[0])) / (m->model_scale / upscale_fac);
-                            float offset_to_model_base_y = (current_game_y - (entities[entity_id].position[1])) / (m->model_scale / upscale_fac);
+                            float offset_to_model_base_x = (current_game_x - (entities[entity_id].position[0])) / ((m->model_scale * entities[entity_id].scale) / upscale_fac);
+                            float offset_to_model_base_y = (current_game_y - (entities[entity_id].position[1])) / ((m->model_scale * entities[entity_id].scale) / upscale_fac);
 
                             if (entities[entity_id].et == ET_PLAYER) {
                                 //inventory
@@ -257,18 +257,18 @@ __global__ void draw_entities_kernel(
                                     if (offset_to_model_base_x + 32.0f + 19 >= 0 && offset_to_model_base_x + 32.0f + 19 < 32) {
                                         //inventory "text"
                                         int letter_idx = (int)(offset_to_model_base_y) / 32;
-                                        int letter_code = -48;
+                                        int letter_code = 0;
                                         if (params[1 + letter_idx * 2] < UINT_MAX) {
                                             if (params[1 + letter_idx * 2] == 50) {
-                                                letter_code += '[';
+                                                letter_code = 1;
                                             }
                                             else if (params[1 + letter_idx * 2] == 51) {
-                                                letter_code += ']';
+                                                letter_code = 2;
                                             }
                                             else if (params[1 + letter_idx * 2] == 52) {
-                                                letter_code += '`';
+                                                letter_code = 3;
                                             }
-                                            if (letter_code >= 0 && letter_code <= 122 - 48) {
+                                            if (letter_code >= 0 && letter_code <= 127 && device_data_assets[font_position + letter_code] > 0) {
                                                 unsigned char* letter = (unsigned char*)&device_data_assets[device_data_assets[font_position + letter_code]];
                                                 int letter_x = (int)(offset_to_model_base_x + 32.0f + 19) % 32;
                                                 int letter_y = (int)offset_to_model_base_y % 32;
@@ -329,9 +329,9 @@ __global__ void draw_entities_kernel(
                                 //top text
                                 if (offset_to_model_base_y < 0 && offset_to_model_base_y >= -32.0f && offset_to_model_base_x + 32.0f >= 0 && offset_to_model_base_x + 32.0f < entities[entity_id].name_len *32) {
                                     int letter_idx = (int)(offset_to_model_base_x + 32.0f) / 32;
-                                    int letter_code = (int)entities[entity_id].name[letter_idx] - 48;
-                                    if (letter_code >= 0 && letter_code <= 122 - 48) {
-                                        unsigned char* letter = (unsigned char*)&device_data_assets[device_data_assets[font_position + (int)entities[entity_id].name[letter_idx] - 48]];
+                                    int letter_code = (int)entities[entity_id].name[letter_idx];
+                                    if (letter_code >= 0 && letter_code <= 127 && device_data_assets[font_position + (int)entities[entity_id].name[letter_idx]] > 0) {
+                                        unsigned char* letter = (unsigned char*)&device_data_assets[device_data_assets[font_position + (int)entities[entity_id].name[letter_idx]]];
                                         int letter_y = (int)offset_to_model_base_y + 32;
                                         int letter_x = ((int)offset_to_model_base_x + 32) % 32;
                                         float letter_alpha = letter[letter_y * (32 * 4) + letter_x * 4 + 3];
@@ -354,7 +354,7 @@ __global__ void draw_entities_kernel(
                                   */
 
                                 unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_position];
-                                unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[(int)(entities[entity_id].orientation / 10) % 36]];
+                                unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[((int)(entities[entity_id].orientation / 10) % 36) * m->model_animation_ticks + (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) % m->model_animation_ticks)]];
 
                                 if (m->mt == MT_LOOTABLE_ITEM) {
                                     if (offset_to_model_base_x <= 22 * camera_z || offset_to_model_base_y <= 22 * camera_z || offset_to_model_base_x >= m->model_dimensions[0] * upscale_fac - (22 * camera_z) || offset_to_model_base_y >= m->model_dimensions[1] * upscale_fac - (22 * camera_z)) {
@@ -416,22 +416,22 @@ __global__ void draw_entities_kernel(
                         int upscale = 1;
                         float upscale_fac = 1.0f;
                         unsigned int model_position = model_positions[upscale - 1];
-                        while (camera_z / (m->model_scale / upscale_fac) < 2 && upscale - 1 < m->model_zoom_level_count - 1) {
+                        while (camera_z / ((m->model_scale * entities[entity_id].scale) / upscale_fac) < 2 && upscale - 1 < m->model_zoom_level_count - 1) {
                             upscale++;
                             model_position = model_positions[upscale - 1];
                             upscale_fac *= 2.0f;
                         }
 
-                        sampling_filter_dim = ceilf(camera_z / (m->model_scale / upscale_fac));
+                        sampling_filter_dim = ceilf(camera_z / ((m->model_scale * entities[entity_id].scale) / upscale_fac));
 
-                        float offset_to_model_base_x = (current_game_x - (entities[entity_id].position[0])) / (m->model_scale / upscale_fac);
-                        float offset_to_model_base_y = (current_game_y - (entities[entity_id].position[1])) / (m->model_scale / upscale_fac);
+                        float offset_to_model_base_x = (current_game_x - (entities[entity_id].position[0])) / ((m->model_scale * entities[entity_id].scale) / upscale_fac);
+                        float offset_to_model_base_y = (current_game_y - (entities[entity_id].position[1])) / ((m->model_scale * entities[entity_id].scale) / upscale_fac);
 
                         if (offset_to_model_base_x >= 1 && offset_to_model_base_x < m->model_dimensions[0] * upscale_fac - 1 &&
                             offset_to_model_base_y >= 1 && offset_to_model_base_y < m->model_dimensions[1] * upscale_fac - 1) {
 
                             unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_position];
-                            unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[(int)(entities[entity_id].orientation / 10) % 36]];
+                            unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[((int)(entities[entity_id].orientation / 10) % 36) * m->model_animation_ticks + (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) % m->model_animation_ticks)]];
 
                             for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
                                 for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
@@ -497,9 +497,11 @@ void entity_add(string name, enum entity_type et, unsigned int model_id, unsigne
     for (int i = name.length(); i < 50; i++) {
         e.name[i] = '\0';
     }
+    e.scale = 1.0f;
     e.orientation = (float)(rand() % 360);
     e.model_id = model_id;
     e.model_z = model_z;
+    e.model_animation_offset = 0;
     for (int i = 0; i < 50; i++) {
         e.params[i] = 0;
     }

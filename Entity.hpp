@@ -20,10 +20,12 @@ struct entity {
 	unsigned int			name_len;
 
 	struct vector3<float>	position;
+	float					scale;
 	float					orientation;
 
 	unsigned int			model_id;
 	unsigned int			model_z;
+	unsigned int			model_animation_offset;
 
 	char					params[50];
 };

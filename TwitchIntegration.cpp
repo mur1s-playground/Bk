@@ -84,9 +84,9 @@ void twitch_update_players(struct bit_field* bf_rw) {
         if (i % 2 == 0) nnnn += "__________________";
         if (players.size() < players_max) {
             player_add(bf_rw, nnnn, PT_HOPE, UINT_MAX);
-            bits_spent.emplace(nnnn, 0);
-            bits_shield.emplace(nnnn, (int)((rand() / (float) RAND_MAX) * 250));
-            bits_bandage.emplace(nnnn, (int)((rand() / (float)RAND_MAX) * 250));
+            //bits_spent.emplace(nnnn, 0);
+            //bits_shield.emplace(nnnn, (int)((rand() / (float) RAND_MAX) * 250));
+            //bits_bandage.emplace(nnnn, (int)((rand() / (float)RAND_MAX) * 250));
         }
     }
     */

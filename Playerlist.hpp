@@ -8,13 +8,13 @@
 struct playerlist_element {
     playerlist_element(const char s[50]) {
         int cur_pos = 0;
-        value[cur_pos++] = '^';
+        value[cur_pos++] = 32;
         for (int i = 0; i < 50; i++) {
             if (s[i] == '\0') break;
             value[cur_pos] = s[i];
             cur_pos++;
         }
-        value[cur_pos++] = '^';
+        value[cur_pos++] = 32;
         for (int i = cur_pos; i < 52; i++) {
             value[i] = '\0';
         }

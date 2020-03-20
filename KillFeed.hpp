@@ -8,19 +8,19 @@
 struct kill_feed_element {
     kill_feed_element(char s[50], char v[50], bool storm) { 
         int cur_pos = 0;
-        value[cur_pos++] = '^';
+        value[cur_pos++] = 32;
         if (!storm) {
             for (int i = 0; i < 50; i++) {
                 if (s[i] == '\0') break;
                 value[cur_pos] = s[i];
                 cur_pos++;
             }
-            value[cur_pos++] = '^';
-            value[cur_pos++] = '=';
-            value[cur_pos++] = '^';
+            value[cur_pos++] = 32;
+            value[cur_pos++] = 4;
+            value[cur_pos++] = 32;
         } else {
-            value[cur_pos++] = ';';
-            value[cur_pos++] = '^';
+            value[cur_pos++] = 5;
+            value[cur_pos++] = 32;
         }
         for (int i = 0; i < 50; i++) {
             if (v[i] == '\0') break;

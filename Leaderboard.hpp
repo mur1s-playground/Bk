@@ -11,13 +11,13 @@
 struct leaderboard_place_element {
     leaderboard_place_element(const char s[8]) {
         int cur_pos = 0;
-        value[cur_pos++] = '^';
+        value[cur_pos++] = 32;
         for (int i = 0; i < 8; i++) {
             if (s[i] == '\0') break;
             value[cur_pos] = s[i];
             cur_pos++;
         }
-        value[cur_pos++] = '^';
+        value[cur_pos++] = 32;
         for (int i = cur_pos; i < 10; i++) {
             value[i] = '\0';
         }

@@ -17,7 +17,8 @@ enum on_click_action_type {
 	BAT_GAMEEND,
 	BAT_QUIT,
 	BAT_SELECT,
-	BAT_GS
+	BAT_GS,
+	BAT_MAPEDITOR_SAVEQUIT
 };
 
 enum ui_element_type {

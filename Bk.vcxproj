@@ -81,6 +81,7 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AssetList.cpp" />
     <ClCompile Include="AssetLoader.cpp" />
     <ClCompile Include="BitField.cpp" />
     <ClCompile Include="Buyfeed.cpp" />
@@ -91,6 +92,7 @@
     <ClCompile Include="Leaderboard.cpp" />
     <ClCompile Include="lodepng.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="MapEditor.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="Playerlist.cpp" />
@@ -99,6 +101,7 @@
     <ClCompile Include="Util.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AssetList.hpp" />
     <ClInclude Include="AssetLoader.hpp" />
     <ClInclude Include="BitField.hpp" />
     <ClInclude Include="Buyfeed.hpp" />
@@ -112,6 +115,7 @@
     <ClInclude Include="lodepng.h" />
     <ClInclude Include="Main.hpp" />
     <ClInclude Include="Map.hpp" />
+    <ClInclude Include="MapEditor.hpp" />
     <ClInclude Include="Model.hpp" />
     <ClInclude Include="Player.hpp" />
     <ClInclude Include="Playerlist.hpp" />

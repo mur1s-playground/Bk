@@ -17,6 +17,8 @@ extern struct bit_field bf_output;
 
 extern struct vector2<unsigned int> resolution;
 
+extern bool map_editor;
+
 extern bool irc_started;
 extern bool running;
 

@@ -18,6 +18,8 @@
 #include "Map.hpp"
 #include "Entity.hpp"
 #include "UI.hpp"
+#include "MapEditor.hpp"
+#include "AssetList.hpp"
 
 struct game_map gm;
 
@@ -25,6 +27,8 @@ unsigned int map_models_position;
 vector<struct model> map_models;
 
 unsigned int map_list_pos;
+
+vector<pair<string, string>> map_static_assets;
 
 __forceinline__
 __device__ float getInterpixel(const unsigned char* frame, const unsigned int width, const unsigned int height, const unsigned int channels, float x, float y, const int c) {
@@ -317,16 +321,24 @@ void map_load(struct bit_field *bf_assets, string name) {
     }
     gm.map_zoom_level_offsets_position = bit_field_add_bulk(bf_assets, map_zoom_level_offsets.data(), map_zoom_level_offsets.size(), map_zoom_level_offsets.size() * sizeof(unsigned int)) + 1;
     gm.map_positions = bit_field_add_bulk(bf_assets, map_positions.data(), map_positions.size(), map_positions.size() * sizeof(unsigned int)) + 1;
-    gm.map_static_assets_position = assets["./maps/" + name + "/" + name + "_static_assets.png"];
     gm.map_loot_probabilities_position = assets["./maps/" + name + "/" + name + ".loot_probabilities.png"];
     gm.map_spawn_probabilities_position = assets["./maps/" + name + "/" + name + ".spawn_probabilities.png"];
     gm.map_pathable_position = assets["./maps/" + name + "/" + name + ".pathable.png"];
+
+    map_static_assets = get_cfg_key_value_pairs("./maps/" + name + "/", name + "_static_assets.cfg");
 
     //load map assets
     vector<string> model_cfgs = get_all_files_names_within_folder("./maps/" + name + "/assets/", "*", "cfg");
     vector<struct model> tmp_models;
     for (int i = 0; i < model_cfgs.size(); i++) {
         struct model m = model_from_cfg(bf_assets, "./maps/" + name + "/assets/", model_cfgs[i]);
+        if (map_editor) {
+            size_t dot_pos = model_cfgs[i].find_last_of('.');
+            if (dot_pos != string::npos) {
+                string m_name = model_cfgs[i].substr(0, dot_pos);
+                assetlist_add(&bf_rw, m.id, m_name.c_str());
+            }
+        }
         tmp_models.push_back(m);
     }
     int counter = 0;
@@ -350,28 +362,49 @@ void map_load(struct bit_field *bf_assets, string name) {
 
 void map_add_static_assets(struct bit_field* bf_assets, struct bit_field* bf_grid, struct grid* gd) {
     printf("starting static asset addition\n");
-    
-    for (int y = 0; y < gm.map_dimensions[1]; y++) {
-        for (int x = 0; x < gm.map_dimensions[0]; x++) {
-            unsigned char* static_asset_frame = (unsigned char*)&bf_assets->data[gm.map_static_assets_position];
-            unsigned char pixel_alpha = static_asset_frame[y * gm.map_dimensions[0] * 4 + x * 4 + 3];
-            if (pixel_alpha > 0) {
-                unsigned char pixel_r = static_asset_frame[y * gm.map_dimensions[0] * 4 + x * 4 + 0];
-                unsigned char pixel_g = static_asset_frame[y * gm.map_dimensions[0] * 4 + x * 4 + 1];
-                unsigned char pixel_b = static_asset_frame[y * gm.map_dimensions[0] * 4 + x * 4 + 2];
 
-                printf("r %i g %i b %i ", (int)pixel_r, (int)pixel_g, (int) pixel_b);
-                int orientation = pixel_r * 16 + (pixel_g / 16);
-                printf("adding asset: %i at x %i y %i, z %i, pixel_orientation %i\n", pixel_b, x, y, pixel_alpha, orientation);
-                entity_add("static_asset", ET_STATIC_ASSET, pixel_b, pixel_alpha);
-                struct entity *cur_e = &entities[entities.size() - 1];
-                cur_e->position = { (float)x, (float)y, 0.0f };
-                cur_e->orientation = orientation;
-                printf("model_scale entity adding %f, shadow dim %i %i\n", map_models[pixel_b-100].model_scale, map_models[pixel_b - 100].shadow_dimensions[0], map_models[pixel_b - 100].shadow_dimensions[1]);
-                struct vector3<float> max_pos = model_get_max_position(&map_models[pixel_b - 100])* map_models[pixel_b - 100].model_scale;
-                grid_object_add(bf_grid, bf_grid->data, gd->position_in_bf, cur_e->position, { 1.0f, 1.0f, 1.0f}, { 0.0f, 0.0f, 0.0f }, max_pos, entities.size()-1);
-            }
-        }
+    for (int i = 0; i < map_static_assets.size(); i++) {
+        string a_id_str = map_static_assets[i].first;
+        a_id_str = trim(a_id_str);
+
+        unsigned int a_id = stoi(a_id_str);
+
+        string a_str = map_static_assets[i].second;
+        size_t sep_pos = a_str.find_first_of(':', 0);
+
+        string a_coords = a_str.substr(0, sep_pos);
+
+        size_t a_coords_sep = a_coords.find(",");
+        string a_coords_x = a_coords.substr(0, a_coords_sep);
+        a_coords_x = trim(a_coords_x);
+        string a_coords_y = a_coords.substr(a_coords_sep + 1);
+        a_coords_y = trim(a_coords_y);
+
+        size_t sep_pos2 = a_str.find_first_of(':', sep_pos + 1);
+        string a_orientation = a_str.substr(sep_pos + 1, sep_pos2-sep_pos);
+        a_orientation = trim(a_orientation);
+
+        sep_pos = a_str.find_first_of(':', sep_pos2 + 1);
+        string a_scale = a_str.substr(sep_pos2+1, sep_pos-sep_pos2);
+        a_scale = trim(a_scale);
+
+        sep_pos2 = a_str.find_first_of(':', sep_pos + 1);
+        string a_zindex = a_str.substr(sep_pos+1, sep_pos2-sep_pos);
+        a_zindex = trim(a_zindex);
+
+        string a_aoffset = a_str.substr(sep_pos2 + 1);
+        a_aoffset = trim(a_aoffset);
+
+        printf("adding asset: %i at x %i y %i, orientation %i, scale: %f, z %i, a_offset: %i\n", a_id, stoi(a_coords_x), stoi(a_coords_y), stoi(a_orientation), stof(a_scale), stoi(a_zindex), stoi(a_aoffset));
+
+        entity_add("static_asset", ET_STATIC_ASSET, a_id, stoi(a_zindex));
+        struct entity* cur_e = &entities[entities.size() - 1];
+        cur_e->position = { (float)stoi(a_coords_x), (float)stoi(a_coords_y), 0.0f };
+        cur_e->scale = stof(a_scale);
+        cur_e->orientation = stoi(a_orientation);
+        cur_e->model_animation_offset = stoi(a_aoffset);
+        struct vector3<float> max_pos = model_get_max_position(&map_models[a_id - 100]) * map_models[a_id - 100].model_scale;
+        grid_object_add(bf_grid, bf_grid->data, gd->position_in_bf, cur_e->position, { stof(a_scale), stof(a_scale), stof(a_scale) }, { 0.0f, 0.0f, 0.0f }, max_pos, entities.size() - 1);
     }
     printf("finished static asset addition\n");
 }

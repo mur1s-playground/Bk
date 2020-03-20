@@ -379,19 +379,30 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
 											has_inv_space--;
 										}
-									}
-									else if (etc->model_id == 51) { //shield
+									} else if (etc->model_id == 51) { //shield
+										if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
+											has_inv_space--;
+										}
+									} else if (etc->model_id == 52) { //bandage
 										if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
 											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
 											has_inv_space--;
 										}
 									}
-									else if (etc->model_id == 52) { //bandage
-										if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
-											has_inv_space--;
+								} else if (etc->et == ET_PLAYER && has_gun >= 0 && pl->inventory[has_gun].item_param % 15 == 0) {
+									if (players[etc->name].health > 0 && gi == grid_get_index(bf_rw.data, gd.position_in_bf, { etc->position[0], etc->position[1], 0.0f })) {
+											pl->inventory[has_gun].item_param++;
+											float hit = (rand() / (float)RAND_MAX);
+											//printf("player: %s shoots at %s", pl->name, etc->name);
+											if (hit < 0.8) {
+												size_t pl_ptr = (size_t)&players[etc->name];
+												unsigned int pl_ptr_1 = ((unsigned int*)&pl_ptr)[0];
+												unsigned int pl_ptr_2 = ((unsigned int*)&pl_ptr)[1];
+												player_action_param_add(pl, PAT_SHOOT_AT, pl_ptr_1, pl_ptr_2);
+											}
+											//printf("\n");
 										}
-									}
 								}
 							}
 						}
@@ -407,21 +418,21 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					delta_y = player_dist_per_tick * ((storm_to.y - en->position[1]) / dist);
 				}
 
-				struct vector2<int> spiral_pos = { (int)en->position[0], (int)en->position[1] + 32 };
-				struct vector2<int> spiral_dir[4] = { {0, 32}, { 32, 0 }, { 0, -32 }, { -32, 0 } };
-				int					spiral_dir_idx = 1;
-				struct vector2<int> spiral_dir_current = spiral_dir[spiral_dir_idx];
-				int					spiral_steps_last = 1;
-				int					spiral_steps = 1;
-				int					spiral_steps_counter = 0;
+				struct vector2<float> spiral_pos = { en->position[0], en->position[1] + 32.0f };
+				struct vector2<float> spiral_dir[4] = { {0.0f, 32.0f}, { 32.0f, 0.0f }, { 0.0f, -32.0f }, { -32.0f, 0 } };
+				int					  spiral_dir_idx = 1;
+				struct vector2<float> spiral_dir_current = spiral_dir[spiral_dir_idx];
+				int					  spiral_steps_last = 1;
+				int					  spiral_steps = 1;
+				int					  spiral_steps_counter = 1;
 
 				while (spiral_steps < 10) {
 					//process grid
-					int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { (float)spiral_pos[0], (float)spiral_pos[1], 0.0f });
+					int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { spiral_pos[0], spiral_pos[1], 0.0f });
 					if (gi > -1) {
 						int g_data_pos = bf_rw.data[gd.data_position_in_bf + 1 + gi];
 						if (g_data_pos > 0) {
-							float dist = sqrtf((spiral_pos[0] - (int)en->position[0]) * (spiral_pos[0] - (int)en->position[0]) + (spiral_pos[1] - (int)en->position[1]) * (spiral_pos[1] - (int)en->position[1])) + 1e-5;
+							float dist = sqrtf((spiral_pos[0] - en->position[0]) * (spiral_pos[0] - en->position[0]) + (spiral_pos[1] - en->position[1]) * (spiral_pos[1] - en->position[1])) + 1e-5;
 							int element_count = bf_rw.data[g_data_pos];
 							for (int e = 0; e < element_count; e++) {
 								unsigned int entity_id = bf_rw.data[g_data_pos + 1 + e];
@@ -431,26 +442,25 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 										if (!storm_is_in({ (float)spiral_pos[0], (float)spiral_pos[1], 0.0f })) {
 											if (etc->model_id == 50) { //colt
 												if (has_gun < 0) {
-													delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
-													delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
+													delta_x = player_dist_per_tick * ((spiral_pos[0] - en->position[0]) / dist);
+													delta_y = player_dist_per_tick * ((spiral_pos[1] - en->position[1]) / dist);
 												}
 											}
 											else if (etc->model_id == 51) { // shield
 												if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-													delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
-													delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
+													delta_x = player_dist_per_tick * ((spiral_pos[0] - en->position[0]) / dist);
+													delta_y = player_dist_per_tick * ((spiral_pos[1] - en->position[1]) / dist);
 												}
 											}
 											else if (etc->model_id == 52) { // bandage
 												if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-													delta_x = player_dist_per_tick * ((spiral_pos[0] - (int)en->position[0]) / dist);
-													delta_y = player_dist_per_tick * ((spiral_pos[1] - (int)en->position[1]) / dist);
+													delta_x = player_dist_per_tick * ((spiral_pos[0] - en->position[0]) / dist);
+													delta_y = player_dist_per_tick * ((spiral_pos[1] - en->position[1]) / dist);
 												}
 											}
 										}
-									} else if (etc->et == ET_PLAYER && has_gun >= 0) {
-										if (dist / 32 < 5 && pl->inventory[has_gun].item_param % 15 == 0) {
-											if (players[etc->name].health > 0) {
+									} else if (etc->et == ET_PLAYER && has_gun >= 0 && pl->inventory[has_gun].item_param % 15 == 0 && dist/32.0f < 5.0f) {
+											if (players[etc->name].health > 0 && gi == grid_get_index(bf_rw.data, gd.position_in_bf, { etc->position[0], etc->position[1], 0.0f })) {
 												pl->inventory[has_gun].item_param++;
 												float hit = (rand() / (float)RAND_MAX);
 												//printf("player: %s shoots at %s", pl->name, etc->name);
@@ -462,7 +472,6 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 												}
 												//printf("\n");
 											}
-										}
 									}
 								}
 							}
@@ -667,13 +676,22 @@ void game_tick() {
 									unsigned int item_entity_id = bf_rw.data[g_data_pos + 1 + e];
 									if (item_entity_id == pap_start[1]) {
 										if (etc->model_id == 50) { //colt
+											bool has_gun = false;
 											for (int inv = 0; inv < 6; inv++) {
-												if (pl->inventory[inv].item_id == UINT_MAX) {
-													//printf("picked up a gun\n");
-													pl->inventory[inv].item_id = 50;
-													pl->inventory[inv].item_param = 5;
-													grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[0].model_scale, item_models[0].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[0]), item_entity_id);
+												if (pl->inventory[inv].item_id == 50) {
+													has_gun = true;
 													break;
+												}
+											}
+											if (!has_gun) {
+												for (int inv = 0; inv < 6; inv++) {
+													if (pl->inventory[inv].item_id == UINT_MAX) {
+														//printf("picked up a gun\n");
+														pl->inventory[inv].item_id = 50;
+														pl->inventory[inv].item_param = 5;
+														grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[0].model_scale, item_models[0].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[0]), item_entity_id);
+														break;
+													}
 												}
 											}
 										}
@@ -772,7 +790,7 @@ void game_tick() {
 						if (kill_count == players.size() - 1) {
 							ui_textfield_set_value(&bf_rw, "ingame_menu", "top_placement", pl->name);
 							char tmp[2];
-							tmp[0] = '^';
+							tmp[0] = 32;
 							tmp[1] = '\0';
 							leaderboard_add(&bf_rw, pl->name, pl->damage_dealt, pl->kills, tmp);
 							pl->alive = false;
@@ -789,7 +807,7 @@ void game_tick() {
 								pl->alive = false;
 								killfeed_add(&bf_rw, NULL, pl->name, true);
 								char tmp[2];
-								tmp[0] = ';';
+								tmp[0] = 5;
 								tmp[1] = '\0';
 								leaderboard_add(&bf_rw, pl->name, pl->damage_dealt, pl->kills, tmp);
 								//object itself

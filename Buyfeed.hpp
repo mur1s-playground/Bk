@@ -9,19 +9,19 @@
 struct buy_feed_element {
     buy_feed_element(char s[50], int item_id) {
         int cur_pos = 0;
-        value[cur_pos++] = '^';
+        value[cur_pos++] = 32;
         for (int i = 0; i < 50; i++) {
             if (s[i] == '\0') break;
             value[cur_pos] = s[i];
             cur_pos++;
         }
-        value[cur_pos++] = '^';
+        value[cur_pos++] = 32;
         if (item_id == 51) {
-            value[cur_pos++] = ']';
+            value[cur_pos++] = 2;
         } else if (item_id == 52) {
-            value[cur_pos++] = '`';
+            value[cur_pos++] = 3;
         }
-        value[cur_pos++] = '^';
+        value[cur_pos++] = 32;
         for (int i = cur_pos; i < 64; i++) {
             value[i] = '\0';
         }

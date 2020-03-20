@@ -32,7 +32,6 @@ struct game_map {
 	unsigned int					map_zoom_level_offsets_position;
 	unsigned int					map_positions;
 
-	unsigned int					map_static_assets_position;
 	unsigned int					map_loot_probabilities_position;
 	unsigned int					map_spawn_probabilities_position;
 	unsigned int					map_pathable_position;
@@ -48,6 +47,8 @@ extern unsigned int map_models_position;
 extern vector<struct model> map_models;
 
 extern unsigned int map_list_pos;
+
+extern vector<pair<string, string>> map_static_assets;
 
 void launch_draw_map(const unsigned int* device_data, const unsigned int map_zoom_level_count, const unsigned int map_zoom_center_z,
 	const unsigned int map_zoom_level_offsets_position, const unsigned int map_positions,

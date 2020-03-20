@@ -12,6 +12,7 @@
 #include "Game.hpp"
 #include "Grid.hpp"
 #include "Main.hpp"
+#include "MapEditor.hpp"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -149,7 +150,7 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                         int letter_x = (current_x - uie->x1y1[0]) % fsize;
                         int letter_y = (current_y - uie->x1y1[1]) % fsize;
                         if (uie->value[letter_idx] != '\0') {
-                            unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)uie->value[letter_idx] - 48];
+                            unsigned int letter_frame_pos = bf_assets_data[fonts_position + (int)uie->value[letter_idx]];
                             unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
                             float alpha = letter_frame[(letter_y)*fsize_fac * (32 * 4) + (letter_x * fsize_fac) * 4 + 3];
                             if (alpha > 0) {
@@ -252,9 +253,9 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
                                     if (current_kfe[letter_idx] != '\0') {
                                         unsigned int letter_frame_pos;
                                         if (text_len > letter_idx_max || content_align == 0) {
-                                            letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[letter_idx] - 48];
+                                            letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[letter_idx]];
                                         } else {
-                                            letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[text_len - 1 - letter_idx] - 48];
+                                            letter_frame_pos = bf_assets_data[fonts_position + (int)current_kfe[text_len - 1 - letter_idx]];
                                         }
                                         unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
 
@@ -343,18 +344,11 @@ void launch_draw_ui_kernel(const unsigned int *bf_assets_data, const unsigned in
 
 void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
     asset_loader_load_folder(bf_assets, "./font/");
-    asset_loader_load_folder(bf_assets, "./font/capital/");
     vector<unsigned int> font_pos;
-    for (int i = 48; i <= 122; i++) {
-        if (i >= 65 && i <= 90) {
-            stringstream ch;
-            ch << (char)i + 31;
-            font_pos.emplace_back(assets["./font/capital/" + ch.str() + ".png"]);
-        } else {
-            stringstream ch;
-            ch << (char)i;
-            font_pos.emplace_back(assets["./font/" + ch.str() + ".png"]);
-        }
+    for (int i = 0; i <= 127; i++) {
+        stringstream ch;
+        ch << i;
+        font_pos.emplace_back(assets["./font/" + ch.str() + ".png"]);
     }
     ui_fonts_position = bit_field_add_bulk(bf_assets, font_pos.data(), font_pos.size(), font_pos.size()*sizeof(unsigned int))+1;
     vector<string> ui_cfgs = get_all_files_names_within_folder("./ui", "*", "cfg");
@@ -453,6 +447,8 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
                                 b.ocat = BAT_GAMESTART;
                             } else if (first == "GAMEEND") {
                                 b.ocat = BAT_GAMEEND;
+                            } else if (first == "MAPEDITOR_SAVEQUIT") {
+                                b.ocat = BAT_MAPEDITOR_SAVEQUIT;
                             }
                         }
                     }
@@ -638,6 +634,10 @@ bool ui_process_click(struct bit_field *bf_rw, unsigned int x, unsigned int y) {
                 } else if (ocat == BAT_GS) {
                     game_ticks_target = stoi(on_click_action_param);
                     break;
+                } else if (ocat == BAT_MAPEDITOR_SAVEQUIT) {
+                    mapeditor_save();
+                    running = false;
+                    break;
                 }
             } else if (active_elements[i].uet == UET_TEXTFIELD) {
 
@@ -771,8 +771,9 @@ void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsign
                     case SDLK_x: val += "x"; break;
                     case SDLK_y: val += "y"; break;
                     case SDLK_z: val += "z"; break;
+                    case SDLK_PERIOD: val += "."; break;
                     //TODO: FIXME
-                    case SDLK_PERIOD: val += "_"; break;
+                    case SDLK_MINUS: val += "_"; break;
                     case SDLK_UNDERSCORE: val += "_"; break;
                     default: break;
                 }
