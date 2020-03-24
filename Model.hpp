@@ -20,8 +20,10 @@ struct model {
 	float							model_scale;
 	unsigned int					model_zoom_level_count;
 	struct vector2<unsigned int>	model_dimensions;
+	unsigned int					model_rotations;
 	unsigned int					model_animation_ticks;
 	unsigned int					model_animation_stepsize;
+	unsigned int					model_animation_type;
 
 	unsigned int					model_positions;
 
@@ -29,8 +31,10 @@ struct model {
 	struct vector2<unsigned int>	shadow_offset;
 	unsigned int					shadow_zoom_level_count;
 	struct vector2<unsigned int>	shadow_dimensions;
+	unsigned int					shadow_rotations;
 	unsigned int					shadow_animation_ticks;
 	unsigned int					shadow_animation_stepsize;
+	unsigned int					shadow_animation_type;
 	
 	unsigned int					shadow_positions;
 };

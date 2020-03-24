@@ -184,7 +184,15 @@ __global__ void draw_entities_kernel(
                                 */
 
                                 unsigned int* p_shadow_positions = (unsigned int*)&device_data_assets[shadow_position];
-                                unsigned char* p_shadow = (unsigned char*)&device_data_assets[p_shadow_positions[((int)(entities[entity_id].orientation / 10) % 36)*m->shadow_animation_ticks + (((tick_counter + entities[entity_id].model_animation_offset) / m->shadow_animation_stepsize) % m->shadow_animation_ticks)]];
+
+                                int animation_tick = (((tick_counter + entities[entity_id].model_animation_offset) / m->shadow_animation_stepsize) % m->shadow_animation_ticks);;
+                                if (m->shadow_animation_type == 1) {
+                                    if (((tick_counter + entities[entity_id].model_animation_offset) / m->shadow_animation_stepsize) / m->shadow_animation_ticks % 2 == 1) {
+                                        animation_tick = m->shadow_animation_ticks -1 - animation_tick;
+                                    }
+                                }
+
+                                unsigned char* p_shadow = (unsigned char*)&device_data_assets[p_shadow_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->shadow_rotations)) % m->shadow_rotations)*m->shadow_animation_ticks + animation_tick]];
 
                                 //enum player_stance p_stance = players[p].player_stance;
                                 //enum player_action p_action = players[p].player_action;
@@ -354,7 +362,15 @@ __global__ void draw_entities_kernel(
                                   */
 
                                 unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_position];
-                                unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[((int)(entities[entity_id].orientation / 10) % 36) * m->model_animation_ticks + (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) % m->model_animation_ticks)]];
+
+                                int animation_tick = (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) % m->model_animation_ticks);
+                                if (m->model_animation_type == 1) {
+                                    if (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) / m->model_animation_ticks % 2 == 1) {
+                                        animation_tick = m->model_animation_ticks -1- animation_tick;
+                                    }
+                                }
+
+                                unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->model_rotations)) % m->model_rotations) * m->model_animation_ticks + animation_tick]];
 
                                 if (m->mt == MT_LOOTABLE_ITEM) {
                                     if (offset_to_model_base_x <= 22 * camera_z || offset_to_model_base_y <= 22 * camera_z || offset_to_model_base_x >= m->model_dimensions[0] * upscale_fac - (22 * camera_z) || offset_to_model_base_y >= m->model_dimensions[1] * upscale_fac - (22 * camera_z)) {
@@ -380,8 +396,8 @@ __global__ void draw_entities_kernel(
 
                                             float interpixel_alpha = getInterpixel(p_model, m->model_dimensions[0] * upscale_fac, m->model_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, 3);
                                             if (interpixel_alpha >= 64) {
-                                                if (entities[entity_id].position[1] + (m->model_dimensions[1] * m->model_scale) > player_y_max) {
-                                                    player_y_max = entities[entity_id].position[1] + (m->model_dimensions[1] * m->model_scale);
+                                                if (entities[entity_id].position[1] + (m->model_dimensions[1] * m->model_scale * entities[entity_id].scale) > player_y_max) {
+                                                    player_y_max = entities[entity_id].position[1] + (m->model_dimensions[1] * m->model_scale * entities[entity_id].scale);
                                                     player_id_max = entity_id;
                                                     s_y = sampling_filter_dim;
                                                     s_x = sampling_filter_dim;
@@ -431,7 +447,15 @@ __global__ void draw_entities_kernel(
                             offset_to_model_base_y >= 1 && offset_to_model_base_y < m->model_dimensions[1] * upscale_fac - 1) {
 
                             unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_position];
-                            unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[((int)(entities[entity_id].orientation / 10) % 36) * m->model_animation_ticks + (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) % m->model_animation_ticks)]];
+
+                            int animation_tick = (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) % m->model_animation_ticks);
+                            if (m->model_animation_type == 1) {
+                                if (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) / m->model_animation_ticks % 2 == 1) {
+                                    animation_tick = m->model_animation_ticks -1 - animation_tick;
+                                }
+                            }
+
+                            unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->model_rotations)) % m->model_rotations) * m->model_animation_ticks + animation_tick]];
 
                             for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
                                 for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {

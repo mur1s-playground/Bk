@@ -114,21 +114,18 @@ __global__ void draw_map_kernel(const unsigned int* device_data, const struct ve
 
         unsigned char* target_frame = (unsigned char*)&device_data_output[frame_position_target];
 
-        float current_source_x = crop_x1 + (current_x * sampling_filter_width_ratio);
-        float current_source_y = crop_y1 + (current_y * sampling_filter_height_ratio);
-
-        int current_source_x_i = (int)floorf(current_source_x);
-        int current_source_y_i = (int)floorf(current_source_y);
-
         float current_tile_x_max = map_dimensions_center[0];
         float current_tile_y_max = map_dimensions_center[1];
+        float zero_fac = 1.0f;
         if (map_zoom_level < map_zoom_level_center) {
             current_tile_x_max /= 2.0f;
             current_tile_y_max /= 2.0f;
+            zero_fac *= 2.0f;
         }
         else if (map_zoom_level > map_zoom_level_center) {
             current_tile_x_max *= 2.0f;
             current_tile_y_max *= 2.0f;
+            zero_fac /= 2.0f;
         }
         int last_width = (int)current_tile_x_max % 1920;
         int last_height = (int)current_tile_y_max % 1080;
@@ -138,11 +135,17 @@ __global__ void draw_map_kernel(const unsigned int* device_data, const struct ve
         int current_tile_x_max_i = (int)ceilf(current_tile_x_max);
         int current_tile_y_max_i = (int)ceilf(current_tile_y_max);
 
-        int current_tile_x = current_source_x_i / 1920;
-        int current_tile_y = current_source_y_i / 1080;
+        float current_source_x = crop_x1 + (current_x * sampling_filter_width_ratio);
+        float current_source_y = crop_y1 + (current_y * sampling_filter_height_ratio);
 
-        float current_tile_source_x = current_source_x - 1920 * current_tile_x;
-        float current_tile_source_y = current_source_y - 1080 * current_tile_y;
+        int current_source_x_i = (int)floorf(current_source_x);
+        int current_source_y_i = (int)floorf(current_source_y);       
+
+        int current_tile_x = current_source_x_i / (1920 * zero_fac);
+        int current_tile_y = current_source_y_i / (1080 * zero_fac);
+
+        float current_tile_source_x = current_source_x/zero_fac - 1920 * current_tile_x;
+        float current_tile_source_y = current_source_y/zero_fac - 1080 * current_tile_y;
 
         int current_tile_width = width;
         int current_tile_height = height;
@@ -154,11 +157,9 @@ __global__ void draw_map_kernel(const unsigned int* device_data, const struct ve
             if (last_height == 0) last_height = 1080;
             current_tile_height = last_height;
         }
-        /*
-        printf("last width: %i", last_width);
-        printf("last height: %i", last_height);
-        */
-        unsigned int map_position = device_data[map_positions + current_tile_y * current_tile_x_max_i + current_tile_x];
+
+        unsigned int zoom_level_offset = device_data[map_zoom_level_offsets_position + map_zoom_level];
+        unsigned int map_position = device_data[map_positions + zoom_level_offset + current_tile_y * current_tile_x_max_i + current_tile_x];
 
         unsigned char* frame = (unsigned char*)&device_data[map_position];
 
@@ -200,24 +201,28 @@ void launch_draw_map(const unsigned int* device_data, const unsigned int map_zoo
     float sampling_filter_width_ratio = (crop_x2 - crop_x1) / (float)(width_target);
     float sampling_filter_height_ratio = (crop_y2 - crop_y1) / (float)(height_target);
 
-    if (sampling_filter_width_ratio < 0.5) {
+    float tmp_sfw = sampling_filter_width_ratio;
+
+    if (sampling_filter_width_ratio >= 2) {
         //zoom out
-        while (sampling_filter_width_ratio < 0.5 && zoom_level > 0) {
+        while (sampling_filter_width_ratio >= 2 && zoom_level > 0) {
             sampling_filter_width_ratio /= 2.0f;
-            sampling_filter_height_ratio /= 2.0f;
+            //sampling_filter_height_ratio /= 2.0f;
             zoom_level--;
         }
-    }
-    else if (sampling_filter_width_ratio >= 2) {
+    } else if (sampling_filter_width_ratio < 0.5) {
         //zoom in
-        while (sampling_filter_width_ratio >= 2 && zoom_level < map_zoom_level_count - 1) {
+        while (sampling_filter_width_ratio < 0.5 && zoom_level < map_zoom_level_count - 1) {
             sampling_filter_width_ratio *= 2.0f;
-            sampling_filter_height_ratio *= 2.0f;
+            //sampling_filter_height_ratio *= 2.0f;
             zoom_level++;
         }
     }
+
     int sampling_filter_width = (int)ceilf(sampling_filter_width_ratio);
     int sampling_filter_height = (int)ceilf(sampling_filter_height_ratio);
+
+    sampling_filter_width_ratio = tmp_sfw;
 
     draw_map_kernel << <blocksPerGrid, threadsPerBlock >> > (device_data, gm.map_dimensions, map_zoom_center_z, zoom_level, map_zoom_level_offsets_position, map_positions, width, height, channels, crop_x1, crop_x2, crop_y1, crop_y2, device_data_output, frame_position_target, width_target, height_target, sampling_filter_width_ratio, sampling_filter_width, sampling_filter_height_ratio, sampling_filter_height);
     err = cudaGetLastError();
@@ -300,7 +305,7 @@ void map_load(struct bit_field *bf_assets, string name) {
             tiledim_x /= 2.0f;
             tiledim_y /= 2.0f;
         }
-        for (int x = i; i > gm.map_zoom_center_z&& i < gm.map_zoom_level_count; x++) {
+        for (int x = 0; i > gm.map_zoom_center_z && i < gm.map_zoom_level_count && x < i; x++) {
             tiledim_x *= 2.0f;
             tiledim_y *= 2.0f;
         }

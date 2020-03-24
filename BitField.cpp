@@ -84,7 +84,7 @@ unsigned int bit_field_get_page_from_index(const struct bit_field* bf, const uns
 unsigned int bit_field_get_free_location(struct bit_field* bf, const unsigned int size, const unsigned int skip) {
 	int skip_ac = skip;
 	if (bf->pages > 10000 && skip_ac == 0) {
-		skip_ac = bf->biggest_tracked_allocated_page;
+		//skip_ac = bf->biggest_tracked_allocated_page;
 	}
 	for (int i = skip_ac; i < bf->pages; i++) {
 		if (bit_field_get_pagetype(bf, i) == 0) {
@@ -110,7 +110,6 @@ unsigned int bit_field_get_free_location(struct bit_field* bf, const unsigned in
 				//				printf("bf->pages: %i, fpol: %i\r\n", bf->pages, bf->biggest_tracked_allocated_page);
 			}
 		}
-
 		int type = bit_field_get_pagetype(bf, i);
 		if (type >= size + 1 && type < bf->pagesize) {
 			for (int j = 0; j < bf->pagesize - type + 1; j += type) {
@@ -340,8 +339,8 @@ void bit_field_remove_bulk_from_segment(struct bit_field* bf, const unsigned int
 	int page = bit_field_get_page_from_index(bf, index);
 	int pagetype = bit_field_get_pagetype_from_index(bf, index);
 	unsigned int size = bf->data[index];
-	memset(&bf->data[index], 0, (size+1u)*sizeof(unsigned int));
-	bit_field_invalidate_bulk(bf, index, size+1u);
+	memset(&bf->data[index], 0, (size+1)*sizeof(unsigned int));
+	bit_field_invalidate_bulk(bf, index, size+1);
 }
 
 /* INTERNAL */

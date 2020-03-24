@@ -14,7 +14,11 @@ struct model model_from_cfg(struct bit_field *bf_assets, string folder, string f
     vector<pair<string, string>> cfg_kv = get_cfg_key_value_pairs(folder, filename);
     struct model m;
     m.model_zoom_level_count = 0;
+    m.model_animation_ticks = 0;
+    m.model_rotations = 0;
     m.shadow_zoom_level_count = 0;
+    m.shadow_animation_ticks = 0;
+    m.shadow_rotations = 0;
     vector<unsigned int> model_assets_positions;
     vector<unsigned int> shadow_assets_positions;
     for (int c_i = 0; c_i < cfg_kv.size(); c_i++) {
@@ -62,17 +66,31 @@ struct model model_from_cfg(struct bit_field *bf_assets, string folder, string f
             m.model_animation_stepsize = stoi(cfg_kv[c_i].second);
             printf("model_animation_stepsize %u\n", m.model_animation_stepsize);
         }
+        if (cfg_kv[c_i].first == "model_animation_type") {
+            m.model_animation_type = stoi(cfg_kv[c_i].second);
+            printf("model_animation_type %u\n", m.model_animation_type);
+        }
+        if (cfg_kv[c_i].first == "model_rotations") {
+            m.model_rotations = stoi(cfg_kv[c_i].second);
+            printf("model_rotations %u\n", m.model_rotations);
+        }
         for (int mz = 0; mz < m.model_zoom_level_count; mz++) {
             stringstream ss;
             ss << mz;
             if (cfg_kv[c_i].first == "model_" + ss.str() + "_file_prefix") {
                 vector<unsigned int> model_assets_positions_mz;
-                for (int r = 1; r <= 36 * m.model_animation_ticks; r++) {
+                int leading_zeros = 4;
+                for (int r = 1; r <= m.model_rotations * m.model_animation_ticks; r++) {
                     stringstream sr;
-                    if (r < 10) {
-                        sr << 0;
+                    int deg_base_idx = (r-1) / m.model_animation_ticks * (36 / m.model_rotations);
+                    int deg_idx = deg_base_idx*m.model_animation_ticks + ((r-1) % m.model_animation_ticks)+1;
+                    for (int j = 0; j < leading_zeros; j++) {
+                        if (deg_idx < pow(10, j)) {
+                            sr << 0;
+                        }
                     }
-                    sr << r;
+                    sr << deg_idx;
+                    //printf("nr: %s\n", sr.str().c_str());
                     model_assets_positions_mz.push_back(assets[folder + filename.substr(0, dot_pos) + "/" + cfg_kv[c_i].second + sr.str() + ".png"]);
                 }
                 model_assets_positions.push_back(bit_field_add_bulk(bf_assets, model_assets_positions_mz.data(), model_assets_positions_mz.size(), model_assets_positions_mz.size() * sizeof(unsigned int)) + 1);
@@ -116,17 +134,30 @@ struct model model_from_cfg(struct bit_field *bf_assets, string folder, string f
             m.shadow_animation_stepsize = stoi(cfg_kv[c_i].second);
             printf("shadow_animation_stepsize %u\n", m.shadow_animation_stepsize);
         }
+        if (cfg_kv[c_i].first == "shadow_animation_type") {
+            m.shadow_animation_type = stoi(cfg_kv[c_i].second);
+            printf("shadow_animation_type %u\n", m.shadow_animation_type);
+        }
+        if (cfg_kv[c_i].first == "shadow_rotations") {
+            m.shadow_rotations = stoi(cfg_kv[c_i].second);
+            printf("shadow_rotations %u\n", m.shadow_rotations);
+        }
         for (int mz = 0; mz < m.shadow_zoom_level_count; mz++) {
             stringstream ss;
             ss << mz;
             if (cfg_kv[c_i].first == "shadow_" + ss.str() + "_file_prefix") {
                 vector<unsigned int> model_shadow_assets_positions_mz;
-                for (int r = 1; r <= 36 * m.shadow_animation_ticks; r++) {
+                int leading_zeros = 4;
+                for (int r = 1; r <= m.shadow_rotations * m.shadow_animation_ticks; r++) {
                     stringstream sr;
-                    if (r < 10) {
-                        sr << 0;
+                    int deg_base_idx = (r-1) / m.shadow_animation_ticks * (36 / m.shadow_rotations);
+                    int deg_idx = deg_base_idx*m.shadow_animation_ticks + ((r-1) % m.shadow_animation_ticks) + 1;
+                    for (int j = 0; j < leading_zeros; j++) {
+                        if (deg_idx < pow(10, j)) {
+                            sr << 0;
+                        }
                     }
-                    sr << r;
+                    sr << deg_idx;
                     //printf("adding shadow asset: %s%s/%s%s.png %u\n", folder.c_str(), filename.substr(0, dot_pos).c_str(), cfg_kv[c_i].second.c_str(), sr.str().c_str(), assets[folder + filename.substr(0, dot_pos) + "/" + cfg_kv[c_i].second + sr.str() + ".png"]);
                     model_shadow_assets_positions_mz.push_back(assets[folder + filename.substr(0, dot_pos) + "/" + cfg_kv[c_i].second + sr.str() + ".png"]);
                 }

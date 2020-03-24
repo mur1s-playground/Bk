@@ -27,7 +27,7 @@ struct kill_feed_element {
             value[cur_pos] = v[i];
             cur_pos++;
         }
-        value[cur_pos++] = '^';
+        value[cur_pos++] = 32;
         for (int i = cur_pos; i < 105; i++) {
             value[i] = '\0';
         }
