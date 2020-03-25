@@ -30,7 +30,8 @@ DWORD WINAPI mapeditor_thread(LPVOID param) {
 			if (mapeditor_selectedasset_entity_id != UINT_MAX) {
 				string scale = ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_scale");
 				float scale_f = stof(scale);
-				grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, mapeditor_selectedasset_position, { scale_f, scale_f, scale_f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models[mapeditor_selectedasset_id - 100]) * map_models[mapeditor_selectedasset_id - 100].model_scale, mapeditor_selectedasset_entity_id);
+				struct model* map_models_bf = (struct model*) & bf_map.data[map_models_position];
+				grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, mapeditor_selectedasset_position, { scale_f, scale_f, scale_f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models_bf[mapeditor_selectedasset_id - 100]) * map_models_bf[mapeditor_selectedasset_id - 100].model_scale, mapeditor_selectedasset_entity_id);
 				mapeditor_selectedasset_entity_id = UINT_MAX;
 			}
 			if (uis["mapeditor_menu"].active_element_id > -1 &&
@@ -53,8 +54,9 @@ DWORD WINAPI mapeditor_thread(LPVOID param) {
 				string scale = ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_scale");
 				float scale_f = stof(scale);
 
-				grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, mapeditor_selectedasset_position, { scale_f, scale_f, scale_f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models[mapeditor_selectedasset_id - 100])* map_models[mapeditor_selectedasset_id - 100].model_scale, mapeditor_selectedasset_entity_id);
-				grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { current_mouse_game_x, current_mouse_game_y, 0.0f}, { scale_f, scale_f, scale_f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models[mapeditor_selectedasset_id - 100]) * map_models[mapeditor_selectedasset_id - 100].model_scale, mapeditor_selectedasset_entity_id);
+				struct model* map_models_bf = (struct model*) & bf_map.data[map_models_position];
+				grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, mapeditor_selectedasset_position, { scale_f, scale_f, scale_f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models_bf[mapeditor_selectedasset_id - 100])* map_models_bf[mapeditor_selectedasset_id - 100].model_scale, mapeditor_selectedasset_entity_id);
+				grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { current_mouse_game_x, current_mouse_game_y, 0.0f}, { scale_f, scale_f, scale_f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models_bf[mapeditor_selectedasset_id - 100]) * map_models_bf[mapeditor_selectedasset_id - 100].model_scale, mapeditor_selectedasset_entity_id);
 				mapeditor_selectedasset_position = { current_mouse_game_x, current_mouse_game_y, 0.0f };
 
 				struct entity* es = (struct entity*) & bf_rw.data[entities_position];
@@ -101,12 +103,12 @@ void mapeditor_init() {
 	assetlist_init(&bf_rw);
 
 	//load first map
-	map_load(&bf_assets, ui_textfield_get_value(&bf_rw, "lobby", "selected_map"));
+	map_load(&bf_map, ui_textfield_get_value(&bf_rw, "lobby", "selected_map"));
 
 	//entity grid
 	grid_init(&bf_rw, &gd, struct vector3<float>((float)gm.map_dimensions[0], (float)gm.map_dimensions[1], 1.0f), struct vector3<float>(32.0f, 32.0f, 1.0f), struct vector3<float>(0, 0, 0));
 
-	map_add_static_assets(&bf_assets, &bf_rw, &gd);
+	map_add_static_assets(&bf_map, &bf_rw, &gd);
 
 	camera = { 0.0f, 0.0f, 1.0f };
 
@@ -140,12 +142,15 @@ void mapeditor_place_object() {
 		//FIXME: memset causing issue
 		//bit_field_remove_bulk_from_segment(&bf_rw, entities_position - 1);
 		entities_upload(&bf_rw);
-		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, mapeditor_selectedasset_position, { scale_f, scale_f, scale_f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models[mapeditor_selectedasset_id - 100]) * map_models[mapeditor_selectedasset_id - 100].model_scale, entities.size() - 1);
+		struct model* map_models_bf = (struct model*) & bf_map.data[map_models_position];
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, mapeditor_selectedasset_position, { scale_f, scale_f, scale_f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models_bf[mapeditor_selectedasset_id - 100]) * map_models_bf[mapeditor_selectedasset_id - 100].model_scale, entities.size() - 1);
 	}
 }
 
 void mapeditor_save() {
-	string filepath = "./maps/" + ui_textfield_get_value(&bf_rw, "lobby", "selected_map") + "/" + ui_textfield_get_value(&bf_rw, "lobby", "selected_map") + "_static_assets.cfg";
+	string name = ui_textfield_get_value(&bf_rw, "lobby", "selected_map");
+
+	string filepath = "./maps/" + name + "/" + name + "_static_assets.cfg";
 
 	ofstream sfile;
 	sfile.open(filepath);
@@ -153,4 +158,22 @@ void mapeditor_save() {
 		sfile << map_static_assets[i].first << " : " << map_static_assets[i].second << std::endl;
 	}
 	sfile.close();
+
+	if (map_editor_update_assets) {
+		bit_field_save_to_disk(&bf_map, "./maps/" + name + "/" + name + ".bf");
+
+		string filepath = "./maps/" + name + "/" + name + ".bf.txt";
+
+		ofstream bfile;
+		bfile.open(filepath);
+
+		bfile << "map_zoom_level_offsets_position	:	" << gm.map_zoom_level_offsets_position << std::endl;
+		bfile << "map_loot_probabilities_position	:	" << gm.map_loot_probabilities_position << std::endl;
+		bfile << "map_pathable_position				:	" << gm.map_pathable_position << std::endl;
+		bfile << "map_positions						:	" << gm.map_positions << std::endl;
+		bfile << "map_spawn_probabilities_position	:	" << gm.map_spawn_probabilities_position << std::endl;
+		bfile << "map_models_position				:	" << map_models_position << std::endl;
+
+		bfile.close();
+	}
 }

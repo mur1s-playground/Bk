@@ -49,6 +49,8 @@ void bit_field_update_host(struct bit_field* bf, unsigned int device_id);
 void bit_field_load_from_disk(struct bit_field* bf, std::string filepath);
 void bit_field_save_to_disk(const struct bit_field* bf, std::string filepath);
 
+void bit_field_free(struct bit_field* bf);
+
 void bit_field_dump(const struct bit_field* bf);
 void bit_field_dump_invalidators(const struct bit_field* bf);
 

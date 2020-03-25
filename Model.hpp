@@ -43,7 +43,7 @@ using namespace std;
 
 extern vector<struct model> models;
 
-struct model model_from_cfg(struct bit_field* bf_assets, string folder, string filename);
+struct model model_from_cfg(struct bit_field* bf_assets, string folder, string filename, bool parse_cfg_only = false);
 struct vector3<float> model_get_max_position(struct model* m);
 
 #endif

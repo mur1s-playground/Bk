@@ -92,14 +92,14 @@ void game_init() {
 	}
 
 	//load first map
-	map_load(&bf_assets, ui_textfield_get_value(&bf_rw, "lobby", "selected_map"));
+	map_load(&bf_map, ui_textfield_get_value(&bf_rw, "lobby", "selected_map"));
 
 	//entity grid
 	grid_init(&bf_rw, &gd, struct vector3<float>((float)gm.map_dimensions[0], (float)gm.map_dimensions[1], 1.0f), struct vector3<float>(32.0f, 32.0f, 1.0f), struct vector3<float>(0, 0, 0));
 
-	map_add_static_assets(&bf_assets, &bf_rw, &gd);
+	map_add_static_assets(&bf_map, &bf_rw, &gd);
 
-	storm_init(&bf_assets, &bf_rw);
+	storm_init(&bf_map, &bf_rw);
 
 	printf("initialization finished\n");
 }
@@ -139,17 +139,17 @@ void game_start() {
 			y = 10.0f + rand() % (gm.map_dimensions[1] - 32);
 			z = 0.0f;
 			unsigned int grid_index = grid_get_index(bf_rw.data, gd.position_in_bf, { x, y, z });
-			if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
-				unsigned char* pathables = (unsigned char*)&bf_assets.data[gm.map_pathable_position];
+			//if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
+				unsigned char* pathables = (unsigned char*)&bf_map.data[gm.map_pathable_position];
 				unsigned char pathable = pathables[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
 				if (pathable > 0) {
-					unsigned char* spawn_probabilities = (unsigned char*)&bf_assets.data[gm.map_spawn_probabilities_position];
+					unsigned char* spawn_probabilities = (unsigned char*)&bf_map.data[gm.map_spawn_probabilities_position];
 					unsigned char spawn_probability = spawn_probabilities[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
 					if (rand() / (float)RAND_MAX * 255 <= spawn_probability) {
 						found_spawn = true;
 					}
 				}
-			}
+			//}
 		}
 		cur_e->position = { x, y, z };
 		struct vector3<float> max_pos = model_get_max_position(&player_models[PT_HOPE]);
@@ -189,17 +189,17 @@ void game_start() {
 			y = 10.0f + rand() % (gm.map_dimensions[1] - 32);
 			z = 0.0f;
 			unsigned int grid_index = grid_get_index(bf_rw.data, gd.position_in_bf, { x, y, z });
-			if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
-				unsigned char* pathables = (unsigned char*)&bf_assets.data[gm.map_pathable_position];
+			//if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
+				unsigned char* pathables = (unsigned char*)&bf_map.data[gm.map_pathable_position];
 				unsigned char pathable = pathables[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
 				if (pathable > 0) {
-					unsigned char* loot_spawn_probabilities = (unsigned char*)&bf_assets.data[gm.map_loot_probabilities_position];
+					unsigned char* loot_spawn_probabilities = (unsigned char*)&bf_map.data[gm.map_loot_probabilities_position];
 					unsigned char loot_spawn_probability = loot_spawn_probabilities[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
 					if (rand() / (float)RAND_MAX * 255 <= loot_spawn_probability) {
 						found_spawn = true;
 					}
 				}
-			}
+			//}
 		}
 		cur_e->position = { x, y, z };
 		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { item_models[0].model_scale, item_models[0].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[0]), entities.size() - 1);
@@ -221,17 +221,17 @@ void game_start() {
 			y = 10.0f + rand() % (gm.map_dimensions[1] - 32);
 			z = 0.0f;
 			unsigned int grid_index = grid_get_index(bf_rw.data, gd.position_in_bf, { x, y, z });
-			if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
-				unsigned char* pathables = (unsigned char*)&bf_assets.data[gm.map_pathable_position];
+			//if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
+				unsigned char* pathables = (unsigned char*)&bf_map.data[gm.map_pathable_position];
 				unsigned char pathable = pathables[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
 				if (pathable > 0) {
-					unsigned char* loot_spawn_probabilities = (unsigned char*)&bf_assets.data[gm.map_loot_probabilities_position];
+					unsigned char* loot_spawn_probabilities = (unsigned char*)&bf_map.data[gm.map_loot_probabilities_position];
 					unsigned char loot_spawn_probability = loot_spawn_probabilities[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
 					if (rand() / (float)RAND_MAX * 255 <= loot_spawn_probability) {
 						found_spawn = true;
 					}
 				}
-			}
+			//}
 		}
 		cur_e->position = { x, y, z };
 		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { item_models[1].model_scale, item_models[1].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[1]), entities.size() - 1);
@@ -253,17 +253,17 @@ void game_start() {
 			y = 10.0f + rand() % (gm.map_dimensions[1] - 32);
 			z = 0.0f;
 			unsigned int grid_index = grid_get_index(bf_rw.data, gd.position_in_bf, { x, y, z });
-			if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
-				unsigned char* pathables = (unsigned char*)&bf_assets.data[gm.map_pathable_position];
+			//if (bf_rw.data[gd.data_position_in_bf + 1 + grid_index] == 0) {
+				unsigned char* pathables = (unsigned char*)&bf_map.data[gm.map_pathable_position];
 				unsigned char pathable = pathables[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
 				if (pathable > 0) {
-					unsigned char* loot_spawn_probabilities = (unsigned char*)&bf_assets.data[gm.map_loot_probabilities_position];
+					unsigned char* loot_spawn_probabilities = (unsigned char*)&bf_map.data[gm.map_loot_probabilities_position];
 					unsigned char loot_spawn_probability = loot_spawn_probabilities[(int)floorf(y) * gm.map_dimensions[0] + (int)floorf(x)];
 					if (rand() / (float)RAND_MAX * 255 <= loot_spawn_probability) {
 						found_spawn = true;
 					}
 				}
-			}
+			//}
 		}
 		cur_e->position = { x, y, z };
 		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { item_models[2].model_scale, item_models[2].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[2]), entities.size() - 1);
@@ -271,9 +271,6 @@ void game_start() {
 
 	printf("uploading entities\n");
 	entities_upload(&bf_rw);
-
-	printf("updating assets players\n");
-	bit_field_update_device(&bf_assets, 0);
 
 	printf("game start successful\n");
 }
@@ -777,7 +774,7 @@ void game_tick() {
 		}
 		bit_field_invalidate_bulk(&bf_rw, entities_position, entities_size_in_bf);
 
-		storm_next(&bf_assets, &bf_rw);
+		storm_next(&bf_map, &bf_rw);
 
 		if (game_ticks % 30 == 0) {
 				twitch_update_bits();
@@ -827,9 +824,7 @@ void game_tick() {
 
 void game_destroy() {
 	//unload map
-	asset_loader_unload_by_containing(&bf_assets, "./maps/" + ui_textfield_get_value(&bf_rw, "lobby", "selected_map") + "/");
-	map_models.clear();
-	bit_field_remove_bulk_from_segment(&bf_assets, map_models_position-1);
+	bit_field_free(&bf_map);
 
 	//unload grid
 	bit_field_remove_bulk_from_segment(&bf_rw, gd.data_position_in_bf);

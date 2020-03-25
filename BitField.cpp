@@ -486,6 +486,14 @@ void bit_field_save_to_disk(const struct bit_field* bf, std::string filepath) {
 	myFile.close();
 }
 
+void bit_field_free(struct bit_field* bf) {
+	//TODO: complete
+	free(bf->data);
+	for (int i = 0; i < bf->devices_c; i++) {
+		cudaFree(bf->device_data[i]);
+	}
+}
+
 void bit_field_dump(const struct bit_field* bf) {
 	printf("dumping bitfield, pages: %i\r\n", bf->pages);
 	for (int i = 0; i < bf->pages; i++) {

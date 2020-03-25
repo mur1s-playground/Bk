@@ -8,9 +8,9 @@
 
 vector<struct model> models;
 
-struct model model_from_cfg(struct bit_field *bf_assets, string folder, string filename) {
+struct model model_from_cfg(struct bit_field *bf_assets, string folder, string filename, bool parse_cfg_only) {
     size_t dot_pos = filename.find_last_of('.');
-    asset_loader_load_folder(bf_assets, folder + filename.substr(0, dot_pos) + "/");
+    if (!parse_cfg_only) asset_loader_load_folder(bf_assets, folder + filename.substr(0, dot_pos) + "/");
     vector<pair<string, string>> cfg_kv = get_cfg_key_value_pairs(folder, filename);
     struct model m;
     m.model_zoom_level_count = 0;
@@ -74,26 +74,28 @@ struct model model_from_cfg(struct bit_field *bf_assets, string folder, string f
             m.model_rotations = stoi(cfg_kv[c_i].second);
             printf("model_rotations %u\n", m.model_rotations);
         }
-        for (int mz = 0; mz < m.model_zoom_level_count; mz++) {
-            stringstream ss;
-            ss << mz;
-            if (cfg_kv[c_i].first == "model_" + ss.str() + "_file_prefix") {
-                vector<unsigned int> model_assets_positions_mz;
-                int leading_zeros = 4;
-                for (int r = 1; r <= m.model_rotations * m.model_animation_ticks; r++) {
-                    stringstream sr;
-                    int deg_base_idx = (r-1) / m.model_animation_ticks * (36 / m.model_rotations);
-                    int deg_idx = deg_base_idx*m.model_animation_ticks + ((r-1) % m.model_animation_ticks)+1;
-                    for (int j = 0; j < leading_zeros; j++) {
-                        if (deg_idx < pow(10, j)) {
-                            sr << 0;
+        if (!parse_cfg_only) {
+            for (int mz = 0; mz < m.model_zoom_level_count; mz++) {
+                stringstream ss;
+                ss << mz;
+                if (cfg_kv[c_i].first == "model_" + ss.str() + "_file_prefix") {
+                    vector<unsigned int> model_assets_positions_mz;
+                    int leading_zeros = 4;
+                    for (int r = 1; r <= m.model_rotations * m.model_animation_ticks; r++) {
+                        stringstream sr;
+                        int deg_base_idx = (r - 1) / m.model_animation_ticks * (36 / m.model_rotations);
+                        int deg_idx = deg_base_idx * m.model_animation_ticks + ((r - 1) % m.model_animation_ticks) + 1;
+                        for (int j = 0; j < leading_zeros; j++) {
+                            if (deg_idx < pow(10, j)) {
+                                sr << 0;
+                            }
                         }
+                        sr << deg_idx;
+                        //printf("nr: %s\n", sr.str().c_str());
+                        model_assets_positions_mz.push_back(assets[folder + filename.substr(0, dot_pos) + "/" + cfg_kv[c_i].second + sr.str() + ".png"]);
                     }
-                    sr << deg_idx;
-                    //printf("nr: %s\n", sr.str().c_str());
-                    model_assets_positions_mz.push_back(assets[folder + filename.substr(0, dot_pos) + "/" + cfg_kv[c_i].second + sr.str() + ".png"]);
+                    model_assets_positions.push_back(bit_field_add_bulk(bf_assets, model_assets_positions_mz.data(), model_assets_positions_mz.size(), model_assets_positions_mz.size() * sizeof(unsigned int)) + 1);
                 }
-                model_assets_positions.push_back(bit_field_add_bulk(bf_assets, model_assets_positions_mz.data(), model_assets_positions_mz.size(), model_assets_positions_mz.size() * sizeof(unsigned int)) + 1);
             }
         }
         if (cfg_kv[c_i].first == "shadow_scale") {
@@ -142,31 +144,35 @@ struct model model_from_cfg(struct bit_field *bf_assets, string folder, string f
             m.shadow_rotations = stoi(cfg_kv[c_i].second);
             printf("shadow_rotations %u\n", m.shadow_rotations);
         }
-        for (int mz = 0; mz < m.shadow_zoom_level_count; mz++) {
-            stringstream ss;
-            ss << mz;
-            if (cfg_kv[c_i].first == "shadow_" + ss.str() + "_file_prefix") {
-                vector<unsigned int> model_shadow_assets_positions_mz;
-                int leading_zeros = 4;
-                for (int r = 1; r <= m.shadow_rotations * m.shadow_animation_ticks; r++) {
-                    stringstream sr;
-                    int deg_base_idx = (r-1) / m.shadow_animation_ticks * (36 / m.shadow_rotations);
-                    int deg_idx = deg_base_idx*m.shadow_animation_ticks + ((r-1) % m.shadow_animation_ticks) + 1;
-                    for (int j = 0; j < leading_zeros; j++) {
-                        if (deg_idx < pow(10, j)) {
-                            sr << 0;
+        if (!parse_cfg_only) {
+            for (int mz = 0; mz < m.shadow_zoom_level_count; mz++) {
+                stringstream ss;
+                ss << mz;
+                if (cfg_kv[c_i].first == "shadow_" + ss.str() + "_file_prefix") {
+                    vector<unsigned int> model_shadow_assets_positions_mz;
+                    int leading_zeros = 4;
+                    for (int r = 1; r <= m.shadow_rotations * m.shadow_animation_ticks; r++) {
+                        stringstream sr;
+                        int deg_base_idx = (r - 1) / m.shadow_animation_ticks * (36 / m.shadow_rotations);
+                        int deg_idx = deg_base_idx * m.shadow_animation_ticks + ((r - 1) % m.shadow_animation_ticks) + 1;
+                        for (int j = 0; j < leading_zeros; j++) {
+                            if (deg_idx < pow(10, j)) {
+                                sr << 0;
+                            }
                         }
+                        sr << deg_idx;
+                        //printf("adding shadow asset: %s%s/%s%s.png %u\n", folder.c_str(), filename.substr(0, dot_pos).c_str(), cfg_kv[c_i].second.c_str(), sr.str().c_str(), assets[folder + filename.substr(0, dot_pos) + "/" + cfg_kv[c_i].second + sr.str() + ".png"]);
+                        model_shadow_assets_positions_mz.push_back(assets[folder + filename.substr(0, dot_pos) + "/" + cfg_kv[c_i].second + sr.str() + ".png"]);
                     }
-                    sr << deg_idx;
-                    //printf("adding shadow asset: %s%s/%s%s.png %u\n", folder.c_str(), filename.substr(0, dot_pos).c_str(), cfg_kv[c_i].second.c_str(), sr.str().c_str(), assets[folder + filename.substr(0, dot_pos) + "/" + cfg_kv[c_i].second + sr.str() + ".png"]);
-                    model_shadow_assets_positions_mz.push_back(assets[folder + filename.substr(0, dot_pos) + "/" + cfg_kv[c_i].second + sr.str() + ".png"]);
+                    shadow_assets_positions.push_back(bit_field_add_bulk(bf_assets, model_shadow_assets_positions_mz.data(), model_shadow_assets_positions_mz.size(), model_shadow_assets_positions_mz.size() * sizeof(unsigned int)) + 1);
                 }
-                shadow_assets_positions.push_back(bit_field_add_bulk(bf_assets, model_shadow_assets_positions_mz.data(), model_shadow_assets_positions_mz.size(), model_shadow_assets_positions_mz.size() * sizeof(unsigned int)) + 1);
             }
         }
     }
-    m.model_positions = bit_field_add_bulk(bf_assets, model_assets_positions.data(), model_assets_positions.size(), model_assets_positions.size() * sizeof(unsigned int)) + 1;
-    m.shadow_positions = bit_field_add_bulk(bf_assets, shadow_assets_positions.data(), shadow_assets_positions.size(), shadow_assets_positions.size() * sizeof(unsigned int)) + 1;
+    if (!parse_cfg_only) {
+        m.model_positions = bit_field_add_bulk(bf_assets, model_assets_positions.data(), model_assets_positions.size(), model_assets_positions.size() * sizeof(unsigned int)) + 1;
+        m.shadow_positions = bit_field_add_bulk(bf_assets, shadow_assets_positions.data(), shadow_assets_positions.size(), shadow_assets_positions.size() * sizeof(unsigned int)) + 1;
+    }
     return m;
 }
 

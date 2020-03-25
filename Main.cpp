@@ -38,6 +38,7 @@ using namespace std;
 struct grid gd;
 
 struct bit_field bf_assets;
+struct bit_field bf_map;
 struct bit_field bf_rw;
 struct bit_field bf_output;
 
@@ -56,6 +57,7 @@ int ui_ticks_per_second = 60;
 unsigned int ui_tick_counter = 0;
 
 bool map_editor = false;
+bool map_editor_update_assets = false;
 
 bool irc_started = false;
 bool running = true;
@@ -150,10 +152,16 @@ int main(int argc, char** argv) {
 	int frame_balancing = (int)floorf(1000.0f/(float)ui_ticks_per_second);
 	long tf = clock();
 
-	if (argc == 3) {
+	if (argc >= 3) {
 		if (string(argv[1]) == "--editor") {
 			map_editor = true;
 			ui_textfield_set_value(&bf_rw, "lobby", "selected_map", argv[2]);
+			if (argc == 4) {
+				if (string(argv[3]) == "--update_assets") {
+					map_editor_update_assets = true;
+				}
+			}
+
 			char orientation[2] = { '0' , '\0' };
 			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_orientation", orientation);
 			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_animationoffset", orientation);
@@ -246,8 +254,8 @@ int main(int argc, char** argv) {
 		if (game_started || map_editor) {
 			camera_move_z_tick();
 			camera_get_crop(camera_crop);
-			launch_draw_map(bf_assets.device_data[0], gm.map_zoom_level_count, gm.map_zoom_center_z, gm.map_zoom_level_offsets_position, gm.map_positions, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
-			launch_draw_entities_kernel(bf_assets.device_data[0], player_models_position, item_models_position, map_models_position, ui_fonts_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
+			launch_draw_map(bf_map.device_data[0], gm.map_zoom_level_count, gm.map_zoom_center_z, gm.map_zoom_level_offsets_position, gm.map_positions, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
+			launch_draw_entities_kernel(bf_assets.device_data[0], bf_map.device_data[0], player_models_position, item_models_position, map_models_position, ui_fonts_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
 				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], mouse_position, game_ticks);
 			if (!map_editor) {
 				launch_draw_storm_kernel(bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[2], camera[2], storm_current, storm_to, 50, { 45, 0, 100 });

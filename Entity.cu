@@ -86,7 +86,7 @@ __device__ float getInterpixel(const unsigned char* frame, const unsigned int wi
 }
 
 __global__ void draw_entities_kernel(
-        const unsigned int* device_data_assets, const unsigned int players_models_position, const unsigned int item_models_position, const unsigned int map_models_position, const unsigned int font_position,
+        const unsigned int* device_data_assets, const unsigned int* device_data_map, const unsigned int players_models_position, const unsigned int item_models_position, const unsigned int map_models_position, const unsigned int font_position,
         const unsigned int* device_data_rw, const unsigned int entities_position, const unsigned int gd_position_in_bf, const unsigned int gd_data_position_in_bf,
         unsigned int* device_data_output, const unsigned int output_position, const unsigned int output_width, const unsigned int output_height, const unsigned int output_channels,
         const unsigned int camera_x1, const unsigned int camera_y1, const float camera_z, const struct vector2<unsigned int> mouse_position, const unsigned int tick_counter) {
@@ -99,7 +99,7 @@ __global__ void draw_entities_kernel(
     
     struct model* player_models = (struct model*) &device_data_assets[players_models_position];
     struct model* item_models = (struct model*) &device_data_assets[item_models_position];
-    struct model* map_models = (struct model*) &device_data_assets[map_models_position];
+    struct model* map_models = (struct model*) &device_data_map[map_models_position];
 
     if (i < output_width * output_height * output_channels) {
         int current_channel = i / (output_width * output_height);
@@ -150,16 +150,19 @@ __global__ void draw_entities_kernel(
                         output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
                         */
                         struct model* m = nullptr;
+                        const unsigned int* shadows_positions;
                         if (entities[entity_id].et == ET_PLAYER) {
                             m = &player_models[entities[entity_id].model_id];
+                            shadows_positions = &device_data_assets[m->shadow_positions];
                         } else if (entities[entity_id].et == ET_ITEM) {
                             m = &item_models[entities[entity_id].model_id - 50];
+                            shadows_positions = &device_data_assets[m->shadow_positions];
                         } else if (entities[entity_id].et == ET_STATIC_ASSET) {
                             m = &map_models[entities[entity_id].model_id - 100];
+                            shadows_positions = &device_data_map[m->shadow_positions];
                         }
                         
                         if (m != nullptr) {
-                            const unsigned int* shadows_positions = &device_data_assets[m->shadow_positions];
                             int upscale = 1;
                             float upscale_fac = 1.0f;
                             unsigned int shadow_position = shadows_positions[upscale - 1];
@@ -182,17 +185,22 @@ __global__ void draw_entities_kernel(
                                 output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255 * (e % 2);
                                 output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
                                 */
-
-                                unsigned int* p_shadow_positions = (unsigned int*)&device_data_assets[shadow_position];
-
                                 int animation_tick = (((tick_counter + entities[entity_id].model_animation_offset) / m->shadow_animation_stepsize) % m->shadow_animation_ticks);;
                                 if (m->shadow_animation_type == 1) {
                                     if (((tick_counter + entities[entity_id].model_animation_offset) / m->shadow_animation_stepsize) / m->shadow_animation_ticks % 2 == 1) {
-                                        animation_tick = m->shadow_animation_ticks -1 - animation_tick;
+                                        animation_tick = m->shadow_animation_ticks - 1 - animation_tick;
                                     }
                                 }
 
-                                unsigned char* p_shadow = (unsigned char*)&device_data_assets[p_shadow_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->shadow_rotations)) % m->shadow_rotations)*m->shadow_animation_ticks + animation_tick]];
+                                unsigned int* p_shadow_positions;
+                                unsigned char* p_shadow;
+                                if (entities[entity_id].et == ET_STATIC_ASSET) {
+                                    p_shadow_positions = (unsigned int*)&device_data_map[shadow_position];
+                                    p_shadow = (unsigned char*)&device_data_map[p_shadow_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->shadow_rotations)) % m->shadow_rotations) * m->shadow_animation_ticks + animation_tick]];
+                                } else {
+                                    p_shadow_positions = (unsigned int*)&device_data_assets[shadow_position];
+                                    p_shadow = (unsigned char*)&device_data_assets[p_shadow_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->shadow_rotations)) % m->shadow_rotations) * m->shadow_animation_ticks + animation_tick]];
+                                }
 
                                 //enum player_stance p_stance = players[p].player_stance;
                                 //enum player_action p_action = players[p].player_action;
@@ -225,16 +233,19 @@ __global__ void draw_entities_kernel(
                     unsigned int entity_id = device_data_rw[entities_iddata_position + 1 + e];
                     if (entity_id < UINT_MAX) {
                         struct model* m = nullptr;
+                        const unsigned int* model_positions;
                         if (entities[entity_id].et == ET_PLAYER) {
                             m = &player_models[entities[entity_id].model_id];
+                            model_positions = &device_data_assets[m->model_positions];
                         } else if (entities[entity_id].et == ET_ITEM) {
                             m = &item_models[entities[entity_id].model_id - 50];
+                            model_positions = &device_data_assets[m->model_positions];
                         } else if (entities[entity_id].et == ET_STATIC_ASSET) {
                             m = &map_models[entities[entity_id].model_id - 100];
+                            model_positions = &device_data_map[m->model_positions];
                         }
 
                         if (m != nullptr) {
-                            const unsigned int* model_positions = &device_data_assets[m->model_positions];
                             int upscale = 1;
                             float upscale_fac = 1.0f;
                             unsigned int model_position = model_positions[upscale - 1];
@@ -361,16 +372,22 @@ __global__ void draw_entities_kernel(
                                   output[current_y * (output_width * output_channels) + current_x * output_channels + 3] = 100;
                                   */
 
-                                unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_position];
-
                                 int animation_tick = (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) % m->model_animation_ticks);
                                 if (m->model_animation_type == 1) {
                                     if (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) / m->model_animation_ticks % 2 == 1) {
-                                        animation_tick = m->model_animation_ticks -1- animation_tick;
+                                        animation_tick = m->model_animation_ticks - 1 - animation_tick;
                                     }
                                 }
 
-                                unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->model_rotations)) % m->model_rotations) * m->model_animation_ticks + animation_tick]];
+                                unsigned int* p_model_positions;
+                                unsigned char* p_model;
+                                if (entities[entity_id].et == ET_STATIC_ASSET) {
+                                    p_model_positions = (unsigned int*)&device_data_map[model_position];
+                                    p_model = (unsigned char*)&device_data_map[p_model_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->model_rotations)) % m->model_rotations) * m->model_animation_ticks + animation_tick]];
+                                } else {
+                                    p_model_positions = (unsigned int*)&device_data_assets[model_position];
+                                    p_model = (unsigned char*)&device_data_assets[p_model_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->model_rotations)) % m->model_rotations) * m->model_animation_ticks + animation_tick]];
+                                }
 
                                 if (m->mt == MT_LOOTABLE_ITEM) {
                                     if (offset_to_model_base_x <= 22 * camera_z || offset_to_model_base_y <= 22 * camera_z || offset_to_model_base_x >= m->model_dimensions[0] * upscale_fac - (22 * camera_z) || offset_to_model_base_y >= m->model_dimensions[1] * upscale_fac - (22 * camera_z)) {
@@ -417,18 +434,19 @@ __global__ void draw_entities_kernel(
                         //unsigned int entity_id = device_data_players[entities_iddata_position + 1 + e];
                         //if (entity_id < UINT_MAX) {
                     struct model* m = nullptr;
+                    const unsigned int* model_positions;
                     if (entities[entity_id].et == ET_PLAYER) {
                         m = &player_models[entities[entity_id].model_id];
-                    }
-                    else if (entities[entity_id].et == ET_ITEM) {
+                        model_positions = &device_data_assets[m->model_positions];
+                    } else if (entities[entity_id].et == ET_ITEM) {
                         m = &item_models[entities[entity_id].model_id - 50];
-                    }
-                    else if (entities[entity_id].et == ET_STATIC_ASSET) {
+                        model_positions = &device_data_assets[m->model_positions];
+                    } else if (entities[entity_id].et == ET_STATIC_ASSET) {
                         m = &map_models[entities[entity_id].model_id - 100];
+                        model_positions = &device_data_map[m->model_positions];
                     }
 
                     if (m != nullptr) {
-                        const unsigned int* model_positions = &device_data_assets[m->model_positions];
                         int upscale = 1;
                         float upscale_fac = 1.0f;
                         unsigned int model_position = model_positions[upscale - 1];
@@ -445,17 +463,24 @@ __global__ void draw_entities_kernel(
 
                         if (offset_to_model_base_x >= 1 && offset_to_model_base_x < m->model_dimensions[0] * upscale_fac - 1 &&
                             offset_to_model_base_y >= 1 && offset_to_model_base_y < m->model_dimensions[1] * upscale_fac - 1) {
-
-                            unsigned int* p_model_positions = (unsigned int*)&device_data_assets[model_position];
-
+                            
                             int animation_tick = (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) % m->model_animation_ticks);
                             if (m->model_animation_type == 1) {
                                 if (((tick_counter + entities[entity_id].model_animation_offset) / m->model_animation_stepsize) / m->model_animation_ticks % 2 == 1) {
-                                    animation_tick = m->model_animation_ticks -1 - animation_tick;
+                                    animation_tick = m->model_animation_ticks - 1 - animation_tick;
                                 }
                             }
 
-                            unsigned char* p_model = (unsigned char*)&device_data_assets[p_model_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->model_rotations)) % m->model_rotations) * m->model_animation_ticks + animation_tick]];
+                            unsigned int* p_model_positions;
+                            unsigned char* p_model;
+                            if (entities[entity_id].et == ET_STATIC_ASSET) {
+                                p_model_positions = (unsigned int*)&device_data_map[model_position];
+                                p_model = (unsigned char*)&device_data_map[p_model_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->model_rotations)) % m->model_rotations) * m->model_animation_ticks + animation_tick]];
+                            }
+                            else {
+                                p_model_positions = (unsigned int*)&device_data_assets[model_position];
+                                p_model = (unsigned char*)&device_data_assets[p_model_positions[((int)(entities[entity_id].orientation / 10 / (36 / m->model_rotations)) % m->model_rotations) * m->model_animation_ticks + animation_tick]];
+                            }
 
                             for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
                                 for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
@@ -490,7 +515,7 @@ __global__ void draw_entities_kernel(
 }
 
 void launch_draw_entities_kernel(
-    const unsigned int* device_data_assets, const unsigned int players_models_position, const unsigned int item_models_position, const unsigned int map_models_position, const unsigned int font_position,
+    const unsigned int* device_data_assets, const unsigned int *device_data_map, const unsigned int players_models_position, const unsigned int item_models_position, const unsigned int map_models_position, const unsigned int font_position,
     const unsigned int* device_data_rw, const unsigned int entities_position, const unsigned int gd_position_in_bf, const unsigned int gd_data_position_in_bf,
     unsigned int* device_data_output, const unsigned int output_position, const unsigned int output_width, const unsigned int output_height, const unsigned int output_channels,
     const unsigned int camera_x1, const unsigned int camera_y1, const float camera_z, const struct vector2<unsigned int> mouse_position, const unsigned int tick_counter) {
@@ -500,7 +525,7 @@ void launch_draw_entities_kernel(
     int threadsPerBlock = 256;
     int blocksPerGrid = (output_width * output_height * 3 + threadsPerBlock - 1) / threadsPerBlock;
 
-    draw_entities_kernel << <blocksPerGrid, threadsPerBlock >> > (device_data_assets, players_models_position, item_models_position, map_models_position, font_position,
+    draw_entities_kernel << <blocksPerGrid, threadsPerBlock >> > (device_data_assets, device_data_map, players_models_position, item_models_position, map_models_position, font_position,
                                 device_data_rw, entities_position, gd_position_in_bf, gd_data_position_in_bf, 
                                 device_data_output, output_position, output_width, output_height, output_channels, 
                                 camera_x1, camera_y1, camera_z, mouse_position, tick_counter);

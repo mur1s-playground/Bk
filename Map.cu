@@ -5,6 +5,8 @@
 #include "Util.hpp"
 #include <vector>
 #include <sstream>
+#include <iostream>
+#include <fstream>
 
 #include "stdio.h"
 
@@ -289,80 +291,141 @@ void map_load(struct bit_field *bf_assets, string name) {
         }
         it++;
     }
-    asset_loader_load_map(bf_assets, name, name + "_", 4);
-    asset_loader_load_map(bf_assets, name, name + ".", 1);
 
-    vector<unsigned int> map_positions;
-    vector<unsigned int> map_zoom_level_offsets;
+    if (map_editor_update_assets) {
+        bit_field_init(bf_assets, 16, 1024);
+        bit_field_register_device(bf_assets, 0);
 
-    map_zoom_level_offsets.emplace_back(0);
-    for (int i = 0; i < gm.map_zoom_level_count; i++) {
-        stringstream ss;
-        ss << i;
-        float tiledim_x = gm.map_dimensions[0] / 1920.0f;
-        float tiledim_y = gm.map_dimensions[1] / 1080.0f;
-        for (int x = i; i < gm.map_zoom_center_z; x++) {
-            tiledim_x /= 2.0f;
-            tiledim_y /= 2.0f;
-        }
-        for (int x = 0; i > gm.map_zoom_center_z && i < gm.map_zoom_level_count && x < i; x++) {
-            tiledim_x *= 2.0f;
-            tiledim_y *= 2.0f;
-        }
-        unsigned int td_x = (unsigned int)ceilf(tiledim_x);
-        unsigned int td_y = (unsigned int)ceilf(tiledim_y);
-        map_zoom_level_offsets.emplace_back(td_x * td_y + map_zoom_level_offsets[i]);
-        printf("tiledim_x %i, tiledim_y %i\n", td_x, td_y);
-        for (int y = 0; y < tiledim_y; y++) {
-            stringstream sy;
-            sy << y;
-            for (int x = 0; x < tiledim_x; x++) {
-                stringstream sx;
-                sx << x;
-                map_positions.emplace_back(assets["./maps/" + name + "/" + name + "_" + ss.str() + "_" + sy.str() + "_" + sx.str() + ".png"]);
-                printf("map_init_positions: %i\n", assets["./maps/" + name + "/" + name + "_" + ss.str() + "_" + sy.str() + "_" + sx.str() + ".png"]);
+        asset_loader_load_map(bf_assets, name, name + "_", 4);
+        asset_loader_load_map(bf_assets, name, name + ".", 1);
+
+        vector<unsigned int> map_positions;
+        vector<unsigned int> map_zoom_level_offsets;
+
+        map_zoom_level_offsets.emplace_back(0);
+        for (int i = 0; i < gm.map_zoom_level_count; i++) {
+            stringstream ss;
+            ss << i;
+            float tiledim_x = gm.map_dimensions[0] / 1920.0f;
+            float tiledim_y = gm.map_dimensions[1] / 1080.0f;
+            for (int x = i; i < gm.map_zoom_center_z; x++) {
+                tiledim_x /= 2.0f;
+                tiledim_y /= 2.0f;
+            }
+            for (int x = 0; i > gm.map_zoom_center_z&& i < gm.map_zoom_level_count && x < i; x++) {
+                tiledim_x *= 2.0f;
+                tiledim_y *= 2.0f;
+            }
+            unsigned int td_x = (unsigned int)ceilf(tiledim_x);
+            unsigned int td_y = (unsigned int)ceilf(tiledim_y);
+            map_zoom_level_offsets.emplace_back(td_x * td_y + map_zoom_level_offsets[i]);
+            printf("tiledim_x %i, tiledim_y %i\n", td_x, td_y);
+            for (int y = 0; y < tiledim_y; y++) {
+                stringstream sy;
+                sy << y;
+                for (int x = 0; x < tiledim_x; x++) {
+                    stringstream sx;
+                    sx << x;
+                    map_positions.emplace_back(assets["./maps/" + name + "/" + name + "_" + ss.str() + "_" + sy.str() + "_" + sx.str() + ".png"]);
+                    printf("map_init_positions: %i\n", assets["./maps/" + name + "/" + name + "_" + ss.str() + "_" + sy.str() + "_" + sx.str() + ".png"]);
+                }
             }
         }
-    }
-    gm.map_zoom_level_offsets_position = bit_field_add_bulk(bf_assets, map_zoom_level_offsets.data(), map_zoom_level_offsets.size(), map_zoom_level_offsets.size() * sizeof(unsigned int)) + 1;
-    gm.map_positions = bit_field_add_bulk(bf_assets, map_positions.data(), map_positions.size(), map_positions.size() * sizeof(unsigned int)) + 1;
-    gm.map_loot_probabilities_position = assets["./maps/" + name + "/" + name + ".loot_probabilities.png"];
-    gm.map_spawn_probabilities_position = assets["./maps/" + name + "/" + name + ".spawn_probabilities.png"];
-    gm.map_pathable_position = assets["./maps/" + name + "/" + name + ".pathable.png"];
+        gm.map_zoom_level_offsets_position = bit_field_add_bulk(bf_assets, map_zoom_level_offsets.data(), map_zoom_level_offsets.size(), map_zoom_level_offsets.size() * sizeof(unsigned int)) + 1;
+        gm.map_positions = bit_field_add_bulk(bf_assets, map_positions.data(), map_positions.size(), map_positions.size() * sizeof(unsigned int)) + 1;
+        gm.map_loot_probabilities_position = assets["./maps/" + name + "/" + name + ".loot_probabilities.png"];
+        gm.map_spawn_probabilities_position = assets["./maps/" + name + "/" + name + ".spawn_probabilities.png"];
+        gm.map_pathable_position = assets["./maps/" + name + "/" + name + ".pathable.png"];
 
-    map_static_assets = get_cfg_key_value_pairs("./maps/" + name + "/", name + "_static_assets.cfg");
+        map_static_assets = get_cfg_key_value_pairs("./maps/" + name + "/", name + "_static_assets.cfg");
 
-    //load map assets
-    vector<string> model_cfgs = get_all_files_names_within_folder("./maps/" + name + "/assets/", "*", "cfg");
-    vector<struct model> tmp_models;
-    for (int i = 0; i < model_cfgs.size(); i++) {
-        struct model m = model_from_cfg(bf_assets, "./maps/" + name + "/assets/", model_cfgs[i]);
+        //load map assets
+        vector<string> model_cfgs = get_all_files_names_within_folder("./maps/" + name + "/assets/", "*", "cfg");
+        vector<struct model> tmp_models;
+        for (int i = 0; i < model_cfgs.size(); i++) {
+            struct model m = model_from_cfg(bf_assets, "./maps/" + name + "/assets/", model_cfgs[i]);
+            if (map_editor) {
+                size_t dot_pos = model_cfgs[i].find_last_of('.');
+                if (dot_pos != string::npos) {
+                    string m_name = model_cfgs[i].substr(0, dot_pos);
+                    assetlist_add(&bf_rw, m.id, m_name.c_str());
+                }
+            }
+            tmp_models.push_back(m);
+        }
+        int counter = 0;
+        struct model empty_model;
+        empty_model.id = UINT_MAX;
+        while (counter < tmp_models.size()) {
+            for (int i = 0; i < tmp_models.size(); i++) {
+                if (tmp_models[i].id == counter + 100) {
+                    map_models.push_back(tmp_models[i]);
+                }
+            }
+            if (map_models.size() < counter + 1) {
+                map_models.push_back(empty_model);
+            }
+            counter++;
+        }
+        unsigned int size = map_models.size() * sizeof(struct model);
+        unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
+        map_models_position = bit_field_add_bulk(bf_assets, (unsigned int*)map_models.data(), size_in_bf, size) + 1;
+    } else {
         if (map_editor) {
-            size_t dot_pos = model_cfgs[i].find_last_of('.');
-            if (dot_pos != string::npos) {
-                string m_name = model_cfgs[i].substr(0, dot_pos);
-                assetlist_add(&bf_rw, m.id, m_name.c_str());
+            vector<string> model_cfgs = get_all_files_names_within_folder("./maps/" + name + "/assets/", "*", "cfg");
+            for (int i = 0; i < model_cfgs.size(); i++) {
+                struct model m = model_from_cfg(bf_assets, "./maps/" + name + "/assets/", model_cfgs[i], true);
+                if (map_editor) {
+                    size_t dot_pos = model_cfgs[i].find_last_of('.');
+                    if (dot_pos != string::npos) {
+                        string m_name = model_cfgs[i].substr(0, dot_pos);
+                        assetlist_add(&bf_rw, m.id, m_name.c_str());
+                    }
+                }
             }
         }
-        tmp_models.push_back(m);
-    }
-    int counter = 0;
-    struct model empty_model;
-    empty_model.id = UINT_MAX;
-    while (counter < tmp_models.size()) {
-        for (int i = 0; i < tmp_models.size(); i++) {
-            if (tmp_models[i].id == counter+100) {
-                map_models.push_back(tmp_models[i]);
+
+        vector<pair<string, string>> map_bf_txt = get_cfg_key_value_pairs("./maps/" + name + "/", name + ".bf.txt");
+        for (int i = 0; i < map_bf_txt.size(); i++) {
+            string cfg_val = map_bf_txt[i].first;
+            cfg_val = trim(cfg_val);
+            if (cfg_val == "map_zoom_level_offsets_position") {
+                string second = map_bf_txt[i].second;
+                second = trim(second);
+                gm.map_zoom_level_offsets_position = stoi(second);
+            }
+            if (cfg_val == "map_loot_probabilities_position") {
+                string second = map_bf_txt[i].second;
+                second = trim(second);
+                gm.map_loot_probabilities_position = stoi(second);
+            }
+            if (cfg_val == "map_pathable_position") {
+                string second = map_bf_txt[i].second;
+                second = trim(second);
+                gm.map_pathable_position = stoi(second);
+            }
+            if (cfg_val == "map_positions") {
+                string second = map_bf_txt[i].second;
+                second = trim(second);
+                gm.map_positions = stoi(second);
+            }
+            if (cfg_val == "map_spawn_probabilities_position") {
+                string second = map_bf_txt[i].second;
+                second = trim(second);
+                gm.map_spawn_probabilities_position = stoi(second);
+            }
+            if (cfg_val == "map_models_position") {
+                string second = map_bf_txt[i].second;
+                second = trim(second);
+                map_models_position = stoi(second);
             }
         }
-        if (map_models.size() < counter + 1) {
-            map_models.push_back(empty_model);
-        }
-        counter++;
+
+        map_static_assets = get_cfg_key_value_pairs("./maps/" + name + "/", name + "_static_assets.cfg");
+        bit_field_load_from_disk(bf_assets, "./maps/" + name + "/" + name + ".bf");
+        bit_field_register_device(bf_assets, 0);
+        bit_field_update_device(bf_assets, 0);
     }
-    unsigned int size = map_models.size() * sizeof(struct model);
-    unsigned int size_in_bf = (unsigned int)ceilf(size / (float)sizeof(unsigned int));
-    map_models_position = bit_field_add_bulk(bf_assets, (unsigned int*)map_models.data(), size_in_bf, size) + 1;
 }
 
 void map_add_static_assets(struct bit_field* bf_assets, struct bit_field* bf_grid, struct grid* gd) {
@@ -402,13 +465,18 @@ void map_add_static_assets(struct bit_field* bf_assets, struct bit_field* bf_gri
 
         printf("adding asset: %i at x %i y %i, orientation %i, scale: %f, z %i, a_offset: %i\n", a_id, stoi(a_coords_x), stoi(a_coords_y), stoi(a_orientation), stof(a_scale), stoi(a_zindex), stoi(a_aoffset));
 
+        struct model* map_models_bfs = (struct model *) &bf_map.data[map_models_position];
+
         entity_add("static_asset", ET_STATIC_ASSET, a_id, stoi(a_zindex));
         struct entity* cur_e = &entities[entities.size() - 1];
         cur_e->position = { (float)stoi(a_coords_x), (float)stoi(a_coords_y), 0.0f };
         cur_e->scale = stof(a_scale);
         cur_e->orientation = stoi(a_orientation);
         cur_e->model_animation_offset = stoi(a_aoffset);
-        struct vector3<float> max_pos = model_get_max_position(&map_models[a_id - 100]) * map_models[a_id - 100].model_scale;
+
+        printf("id: %i, mas: %i, mat: %i\n", map_models_bfs[a_id - 100].id, map_models_bfs[a_id - 100].model_animation_stepsize, map_models_bfs[a_id - 100].model_animation_ticks);
+
+        struct vector3<float> max_pos = model_get_max_position(&map_models_bfs[a_id - 100]) * map_models_bfs[a_id - 100].model_scale;
         grid_object_add(bf_grid, bf_grid->data, gd->position_in_bf, cur_e->position, { stof(a_scale), stof(a_scale), stof(a_scale) }, { 0.0f, 0.0f, 0.0f }, max_pos, entities.size() - 1);
     }
     printf("finished static asset addition\n");

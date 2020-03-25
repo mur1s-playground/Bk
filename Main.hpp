@@ -12,12 +12,14 @@
 extern struct grid gd;
 
 extern struct bit_field bf_assets;
+extern struct bit_field bf_map;
 extern struct bit_field bf_rw;
 extern struct bit_field bf_output;
 
 extern struct vector2<unsigned int> resolution;
 
 extern bool map_editor;
+extern bool map_editor_update_assets;
 
 extern bool irc_started;
 extern bool running;
