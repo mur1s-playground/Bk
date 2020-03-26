@@ -77,7 +77,7 @@ DWORD WINAPI mapeditor_thread(LPVOID param) {
 				cur_e->model_animation_offset = stoi(animationoffset);
 			}
 			if (mapeditor_selectedasset_id < UINT_MAX && mapeditor_selectedasset_entity_id == UINT_MAX) {
-				entity_add("static_asset", ET_STATIC_ASSET, mapeditor_selectedasset_id, 255);
+				entity_add("static_asset", ET_STATIC_ASSET, mapeditor_selectedasset_id, stoi(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_zindex")));
 				mapeditor_selectedasset_entity_id = entities.size() - 1;
 				struct entity* cur_e = &entities[entities.size() - 1];
 				cur_e->position = { 0.0f, 0.0f, 0.0f };
@@ -92,7 +92,7 @@ DWORD WINAPI mapeditor_thread(LPVOID param) {
 		}
 
 		ReleaseMutex(bf_rw.device_locks[0]);
-		std::this_thread::sleep_for(std::chrono::milliseconds(16));
+		std::this_thread::sleep_for(std::chrono::milliseconds(32));
 
 		game_ticks++;
 	}
@@ -129,10 +129,13 @@ void mapeditor_place_object() {
 		unsigned int orientation = stoi(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_orientation"));
 		unsigned int animationoffset = stoi(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_animationoffset"));
 		float scale_f = stof(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_scale"));
-		c_ss << mapeditor_selectedasset_position[0] << ", " << mapeditor_selectedasset_position[1] << " : " << orientation << " : " << scale_f << " : 255 : " << animationoffset;
+
+		unsigned int zindex = stoi(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_zindex"));
+
+		c_ss << mapeditor_selectedasset_position[0] << ", " << mapeditor_selectedasset_position[1] << " : " << orientation << " : " << scale_f << " : " << zindex << " : " << animationoffset;
 		cur_object.second = c_ss.str();
 		map_static_assets.emplace_back(cur_object);
-		entity_add("static_asset", ET_STATIC_ASSET, mapeditor_selectedasset_id, 255);
+		entity_add("static_asset", ET_STATIC_ASSET, mapeditor_selectedasset_id, zindex);
 		struct entity* cur_e = &entities[entities.size() - 1];
 		cur_e->position = mapeditor_selectedasset_position;
 		cur_e->orientation = orientation;
@@ -144,6 +147,24 @@ void mapeditor_place_object() {
 		entities_upload(&bf_rw);
 		struct model* map_models_bf = (struct model*) & bf_map.data[map_models_position];
 		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, mapeditor_selectedasset_position, { scale_f, scale_f, scale_f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&map_models_bf[mapeditor_selectedasset_id - 100]) * map_models_bf[mapeditor_selectedasset_id - 100].model_scale, entities.size() - 1);
+		if (ui_value_get_int(&bf_rw, "mapeditor_menu", "asset_scale_random", 0) == 1) {
+			float rand_val = stof(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_scale_random_range")) + (rand() / (float)RAND_MAX)*(stof(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_scale_random_range2"))-stof(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_scale_random_range")));
+			stringstream r_ss;
+			r_ss << rand_val;
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_scale", r_ss.str().c_str());
+		}
+		if (ui_value_get_int(&bf_rw, "mapeditor_menu", "asset_orientation_random", 0) == 1) {
+			int rand_val = stoi(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_orientation_random_range")) + (int)roundf((rand() / (float)RAND_MAX) * (stoi(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_orientation_random_range2")) - stoi(ui_textfield_get_value(&bf_rw, "mapeditor_menu", "asset_orientation_random_range"))));
+			stringstream r_ss;
+			r_ss << rand_val;
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_orientation", r_ss.str().c_str());
+		}
+		if (ui_value_get_int(&bf_rw, "mapeditor_menu", "asset_animationoffset_random", 0) == 1) {
+			int rand_val = (int)roundf((rand() / (float)RAND_MAX) * (map_models_bf[mapeditor_selectedasset_id - 100].model_animation_ticks-1));
+			stringstream r_ss;
+			r_ss << rand_val;
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_animationoffset", r_ss.str().c_str());
+		}
 	}
 }
 

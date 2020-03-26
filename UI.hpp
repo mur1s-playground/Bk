@@ -25,7 +25,8 @@ enum ui_element_type {
 	UET_TEXTFIELD,
 	UET_BUTTON,
 	UET_SCROLLLIST,
-	UET_IMAGE
+	UET_IMAGE,
+	UET_CHECKBOX
 };
 
 struct ui_element {
@@ -68,6 +69,9 @@ bool ui_process_click(struct bit_field* bf_rw, unsigned int x, unsigned int y);
 bool ui_process_scroll(struct bit_field* bf_rw, unsigned int x, unsigned int y, int z);
 void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsigned int y, const unsigned int sdl_keyval_enum);
 
+int ui_value_get_int_from_eid(struct bit_field* bf_rw, string ui_name, int element_idx, int index);
+int ui_value_get_int(struct bit_field* bf_rw, string ui_name, string element_name, int index);
+void ui_value_as_config_by_eid(struct bit_field* bf_rw, string ui_name, int element_idx, int index, int value);
 void ui_value_as_config(struct bit_field* bf_rw, string ui_name, string element_name, int index, int value);
 
 void ui_textfield_set_int(struct bit_field* bf_rw, string ui_name, string ui_element_name, int value);

@@ -164,9 +164,16 @@ int main(int argc, char** argv) {
 
 			char orientation[2] = { '0' , '\0' };
 			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_orientation", orientation);
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_orientation_random_range", orientation);
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_orientation_random_range2", orientation);
+
 			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_animationoffset", orientation);
 			char scale[4] = {'1', '.', '0', '\0' };
 			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_scale", scale);
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_scale_random_range", scale);
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_scale_random_range2", scale);
+			char zindex[4] = {'2', '5', '5', '\0' };
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_zindex", zindex);
 			printf("map_to_edit: %s\n", argv[2]);
 			mapeditor_init();
 			ui_set_active("mapeditor_overlay");

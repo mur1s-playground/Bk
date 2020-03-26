@@ -226,6 +226,7 @@ __global__ void draw_entities_kernel(
                         }
                     }
                 }
+                unsigned int player_z_max = 0;
                 float player_y_max = -1.0f;
                 int player_id_max = -1;
                 bool has_text = false;
@@ -413,7 +414,8 @@ __global__ void draw_entities_kernel(
 
                                             float interpixel_alpha = getInterpixel(p_model, m->model_dimensions[0] * upscale_fac, m->model_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, 3);
                                             if (interpixel_alpha >= 64) {
-                                                if (entities[entity_id].position[1] + (m->model_dimensions[1] * m->model_scale * entities[entity_id].scale) > player_y_max) {
+                                                if ((entities[entity_id].position[1] + (m->model_dimensions[1] * m->model_scale * entities[entity_id].scale) > player_y_max && entities[entity_id].model_z == player_z_max) || entities[entity_id].model_z > player_z_max) {
+                                                    player_z_max = entities[entity_id].model_z;
                                                     player_y_max = entities[entity_id].position[1] + (m->model_dimensions[1] * m->model_scale * entities[entity_id].scale);
                                                     player_id_max = entity_id;
                                                     s_y = sampling_filter_dim;

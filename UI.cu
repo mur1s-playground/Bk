@@ -135,7 +135,27 @@ __global__ void draw_ui_kernel(const unsigned int* bf_assets_data, const unsigne
             struct ui_element* uies = (struct ui_element*) &bf_rw_data[ui_elements_position];
             for (int ui = 0; ui < uies_count; ui++) {
                 struct ui_element *uie = &uies[ui];
-                if (uie->uet == UET_TEXTFIELD) {
+                if (uie->uet == UET_CHECKBOX) {
+                    int fsize = uie->font_size;
+                    int fsize_fac = 32 / fsize;
+                    if (current_x >= uie->x1y1[0] && current_x < uie->x1y1[0] + fsize && current_x < uie->x2y2[0] && current_y >= uie->x1y1[1] && current_y < uie->x1y1[1] + fsize) {
+                        int letter_x = (current_x - uie->x1y1[0]) % fsize;
+                        int letter_y = (current_y - uie->x1y1[1]) % fsize;
+                        int letter_idx = 88;
+                        int* config = (int*)&uie->value[0];
+                        if (config[0] == 0) {
+                            letter_idx = 95;
+                        }
+                        unsigned int letter_frame_pos = bf_assets_data[fonts_position + letter_idx];
+                        unsigned char* letter_frame = (unsigned char*)&bf_assets_data[letter_frame_pos];
+                        float alpha = letter_frame[(letter_y)*fsize_fac * (32 * 4) + (letter_x * fsize_fac) * 4 + 3];
+                        if (alpha > 0) {
+                            for (int c = 0; c < channels - 1; c++) {
+                                target_frame[current_y * (width * channels) + current_x * channels + c] = (unsigned char)((255 - alpha) / 255.0f * target_frame[current_y * (width * channels) + current_x * channels + c] + (alpha / 255.0f) * letter_frame[(letter_y)*fsize_fac * (32 * 4) + letter_x * fsize_fac * 4 + c]);
+                            }
+                        }
+                    }
+                } else if (uie->uet == UET_TEXTFIELD) {
                     int name_len = 0;
                     for (int j = 0; j < 50; j++) {
                         if (uie->value[j] == '\0') {
@@ -363,6 +383,44 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
             for (int i = 0; i < kv_pairs.size(); i++) {
                 if (kv_pairs[i].first == "background") {
                     u.background_position = assets["./ui/" + content_folder + "/" + kv_pairs[i].second + ".png"];
+                }
+                if (kv_pairs[i].first == "checkbox") {
+                    struct ui_element t;
+                    t.uet = UET_CHECKBOX;
+                    t.name = kv_pairs[i].second;
+                    for (int ch = 0; ch < 51; ch++) {
+                        t.value[ch] = '\0';
+                    }
+                    int* config = (int*)&t.value[0];
+                    if (kv_pairs[i + 1].first == kv_pairs[i].second + "_x1y1") {
+                        size_t sep = kv_pairs[i + 1].second.find(",");
+                        if (sep != string::npos) {
+                            string first = kv_pairs[i + 1].second.substr(0, sep);
+                            first = trim(first);
+                            string second = kv_pairs[i + 1].second.substr(sep + 1);
+                            second = trim(second);
+                            t.x1y1 = { (unsigned int)stoi(first), (unsigned int)stoi(second) };
+                        }
+                    }
+                    if (kv_pairs[i + 2].first == kv_pairs[i].second + "_x2y2") {
+                        size_t sep = kv_pairs[i + 2].second.find(",");
+                        if (sep != string::npos) {
+                            string first = kv_pairs[i + 2].second.substr(0, sep);
+                            first = trim(first);
+                            string second = kv_pairs[i + 2].second.substr(sep + 1);
+                            second = trim(second);
+                            t.x2y2 = { (unsigned int)stoi(first), (unsigned int)stoi(second) };
+                        }
+                    }
+                    if (kv_pairs[i + 3].first == kv_pairs[i].second + "_checked") {
+                        string first = kv_pairs[i + 3].second;
+                        first = trim(first);
+                        config[0] = stoi(first);
+                    } else {
+                        config[0] = 0;
+                    }
+                    printf("adding checkbox %s\n", t.name.c_str());
+                    u.ui_elements.push_back(t);
                 }
                 if (kv_pairs[i].first == "textfield") {
                     struct ui_element t;
@@ -639,6 +697,13 @@ bool ui_process_click(struct bit_field *bf_rw, unsigned int x, unsigned int y) {
                     running = false;
                     break;
                 }
+            } else if (active_elements[i].uet == UET_CHECKBOX) {
+                struct ui_element* uies = (struct ui_element*) &bf_rw->data[ui_elements_position[ui_active]];
+                if (ui_value_get_int_from_eid(bf_rw, ui_active, i, 0) == 0) {
+                    ui_value_as_config_by_eid(bf_rw, ui_active, i, 0, 1);
+                } else {
+                    ui_value_as_config_by_eid(bf_rw, ui_active, i, 0, 0);
+                }
             } else if (active_elements[i].uet == UET_TEXTFIELD) {
 
             } else if (active_elements[i].uet == UET_SCROLLLIST) {
@@ -861,14 +926,30 @@ void ui_process_keys(struct bit_field* bf_rw, const unsigned int x, const unsign
     }
 }
 
-void ui_value_as_config(struct bit_field *bf_rw, string ui_name, string element_name, int index, int value) {
+int ui_value_get_int_from_eid(struct bit_field* bf_rw, string ui_name, int element_idx, int index) {
+    int uc = element_idx;
+    if (uc < uis[ui_name].ui_elements.size()) {
+        struct ui_element* uies = (struct ui_element*) & bf_rw->data[ui_elements_position[ui_name]];
+        struct ui_element* uie = &uies[uc];
+
+        int* config = (int*)&uis[ui_name].ui_elements[uc].value[0];
+        return config[index];
+    }
+    return -1;
+}
+
+int ui_value_get_int(struct bit_field* bf_rw, string ui_name, string element_name, int index) {
     int uc;
     for (uc = 0; uc < uis[ui_name].ui_elements.size(); uc++) {
         if (uis[ui_name].ui_elements[uc].name == element_name) {
             break;
         }
     }
+    return ui_value_get_int_from_eid(bf_rw, ui_name, uc, index);
+}
 
+void ui_value_as_config_by_eid(struct bit_field* bf_rw, string ui_name, int element_idx, int index, int value) {
+    int uc = element_idx;
     if (uc < uis[ui_name].ui_elements.size()) {
         struct ui_element* uies = (struct ui_element*) & bf_rw->data[ui_elements_position[ui_name]];
         struct ui_element* uie = &uies[uc];
@@ -881,9 +962,21 @@ void ui_value_as_config(struct bit_field *bf_rw, string ui_name, string element_
         int ui_size = uis[ui_name].ui_elements.size() * sizeof(struct ui_element);
         unsigned int ui_size_in_bf = (unsigned int)ceilf(ui_size / (float)sizeof(unsigned int));
         bit_field_invalidate_bulk(bf_rw, ui_elements_position[ui_name], ui_size_in_bf);
-    } else {
+    }
+    else {
         printf("trying to write cfg out of ui_elements bounds\n");
     }
+}
+
+void ui_value_as_config(struct bit_field *bf_rw, string ui_name, string element_name, int index, int value) {
+    int uc;
+    for (uc = 0; uc < uis[ui_name].ui_elements.size(); uc++) {
+        if (uis[ui_name].ui_elements[uc].name == element_name) {
+            break;
+        }
+    }
+
+    ui_value_as_config_by_eid(bf_rw, ui_name, uc, index, value);
 }
 
 void ui_textfield_set_int(struct bit_field *bf_rw, string ui_name, string ui_element_name, int value) {

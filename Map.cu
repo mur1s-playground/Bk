@@ -424,8 +424,8 @@ void map_load(struct bit_field *bf_assets, string name) {
         map_static_assets = get_cfg_key_value_pairs("./maps/" + name + "/", name + "_static_assets.cfg");
         bit_field_load_from_disk(bf_assets, "./maps/" + name + "/" + name + ".bf");
         bit_field_register_device(bf_assets, 0);
-        bit_field_update_device(bf_assets, 0);
     }
+    bit_field_update_device(bf_assets, 0);
 }
 
 void map_add_static_assets(struct bit_field* bf_assets, struct bit_field* bf_grid, struct grid* gd) {
@@ -473,8 +473,6 @@ void map_add_static_assets(struct bit_field* bf_assets, struct bit_field* bf_gri
         cur_e->scale = stof(a_scale);
         cur_e->orientation = stoi(a_orientation);
         cur_e->model_animation_offset = stoi(a_aoffset);
-
-        printf("id: %i, mas: %i, mat: %i\n", map_models_bfs[a_id - 100].id, map_models_bfs[a_id - 100].model_animation_stepsize, map_models_bfs[a_id - 100].model_animation_ticks);
 
         struct vector3<float> max_pos = model_get_max_position(&map_models_bfs[a_id - 100]) * map_models_bfs[a_id - 100].model_scale;
         grid_object_add(bf_grid, bf_grid->data, gd->position_in_bf, cur_e->position, { stof(a_scale), stof(a_scale), stof(a_scale) }, { 0.0f, 0.0f, 0.0f }, max_pos, entities.size() - 1);

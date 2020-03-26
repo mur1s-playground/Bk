@@ -118,7 +118,7 @@ void game_start() {
 		stringstream ss_p;
 		ss_p << i;
 
-		entity_add(string(pl_it->second.name), ET_PLAYER, 0, 0);
+		entity_add(string(pl_it->second.name), ET_PLAYER, 0, 255);
 		struct entity* cur_e = &entities[entities.size() - 1];
 
 		cur_e->params[0] = (char)pl_it->second.health;
@@ -178,7 +178,7 @@ void game_start() {
 	for (int i = 0; i < weapon_count; i++) {
 		stringstream ss_p;
 		ss_p << i;
-		entity_add("colt_" + ss_p.str(), ET_ITEM, 50, 0);
+		entity_add("colt_" + ss_p.str(), ET_ITEM, 50, 250);
 		struct entity* cur_e = &entities[entities.size() - 1];
 		bool found_spawn = false;
 		float x = 0;
@@ -210,7 +210,7 @@ void game_start() {
 	for (int i = 0; i < shield_count; i++) {
 		stringstream ss_p;
 		ss_p << i;
-		entity_add("bottle_" + ss_p.str(), ET_ITEM, 51, 0);
+		entity_add("bottle_" + ss_p.str(), ET_ITEM, 51, 250);
 		struct entity* cur_e = &entities[entities.size() - 1];
 		bool found_spawn = false;
 		float x = 0;
@@ -242,7 +242,7 @@ void game_start() {
 	for (int i = 0; i < bandages_count; i++) {
 		stringstream ss_p;
 		ss_p << i;
-		entity_add("bandage_" + ss_p.str(), ET_ITEM, 52, 0);
+		entity_add("bandage_" + ss_p.str(), ET_ITEM, 52, 250);
 		struct entity* cur_e = &entities[entities.size() - 1];
 		bool found_spawn = false;
 		float x = 0;

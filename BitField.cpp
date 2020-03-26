@@ -86,6 +86,7 @@ unsigned int bit_field_get_free_location(struct bit_field* bf, const unsigned in
 	if (bf->pages > 10000 && skip_ac == 0) {
 		//skip_ac = bf->biggest_tracked_allocated_page;
 	}
+	int max_add = (int)min(bf->pages / 2, 50000);
 	for (int i = skip_ac; i < bf->pages; i++) {
 		if (bit_field_get_pagetype(bf, i) == 0) {
 			int type = 1;
@@ -93,7 +94,7 @@ unsigned int bit_field_get_free_location(struct bit_field* bf, const unsigned in
 			if (type > bf->pagesize) {
 				int occupied = 0;
 				for (int j = 1; j < ceil(type / (float)bf->pagesize); j++) {
-					while (i + j >= bf->pages) bit_field_add_pages(bf, bf->pages / 2);
+					while (i + j >= bf->pages) bit_field_add_pages(bf, max_add);
 					if (bit_field_get_pagetype(bf, i + j) != 0) {
 						occupied = j;
 						break;
@@ -134,7 +135,7 @@ unsigned int bit_field_get_free_location(struct bit_field* bf, const unsigned in
 		}
 	}
 	int old_pages = bf->pages;
-	bit_field_add_pages(bf, bf->pages / 2);
+	bit_field_add_pages(bf, max_add);
 	return bit_field_get_free_location(bf, size, old_pages);
 }
 /* END INTERNAL */
