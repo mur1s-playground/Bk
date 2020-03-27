@@ -69,6 +69,8 @@ void player_add(struct bit_field *bf_rw, string name, enum player_type pt, unsig
             p.inventory[i].item_id = UINT_MAX;
             p.inventory[i].item_param = 0;
         }
+        p.move_reason = PAT_NONE;
+        p.move_target = { -1.0f , -1.0f };
         p.actions = 0;
         p.entity_id = entity_id;
         players.try_emplace(name, p);

@@ -225,7 +225,7 @@ void launch_draw_map(const unsigned int* device_data, const unsigned int map_zoo
     int sampling_filter_height = (int)ceilf(sampling_filter_height_ratio);
 
     sampling_filter_width_ratio = tmp_sfw;
-
+    
     draw_map_kernel << <blocksPerGrid, threadsPerBlock >> > (device_data, gm.map_dimensions, map_zoom_center_z, zoom_level, map_zoom_level_offsets_position, map_positions, width, height, channels, crop_x1, crop_x2, crop_y1, crop_y2, device_data_output, frame_position_target, width_target, height_target, sampling_filter_width_ratio, sampling_filter_width, sampling_filter_height_ratio, sampling_filter_height);
     err = cudaGetLastError();
 

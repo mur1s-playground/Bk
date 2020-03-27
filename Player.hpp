@@ -15,6 +15,7 @@ enum player_type {
 };
 
 enum player_action_type {
+	PAT_NONE,
 	PAT_BUY_ITEM,
 	PAT_PICKUP_ITEM,
 	PAT_SHOOT_AT,
@@ -37,6 +38,9 @@ struct player {
 
 	unsigned int			inventory_active_slot;
 	struct item				inventory[6];
+
+	enum player_action_type move_reason;
+	vector2<float>			move_target;
 
 	unsigned int			actions;
 	unsigned int			action_params[50];

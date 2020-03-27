@@ -174,6 +174,10 @@ int main(int argc, char** argv) {
 			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_scale_random_range2", scale);
 			char zindex[4] = {'2', '5', '5', '\0' };
 			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "asset_zindex", zindex);
+			char pathing_brushsize[] = {'1', '\0' };
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "pathing_brushsize_x", pathing_brushsize);
+			ui_textfield_set_value(&bf_rw, "mapeditor_menu", "pathing_brushsize_y", pathing_brushsize);
+
 			printf("map_to_edit: %s\n", argv[2]);
 			mapeditor_init();
 			ui_set_active("mapeditor_overlay");
@@ -186,6 +190,7 @@ int main(int argc, char** argv) {
 	while (running) {
 		long tf_l = clock();
 
+		WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
 		while (SDL_PollEvent(&sdl_event) != 0) {
 			if (game_started || map_editor) {
 				if (sdl_event.type == SDL_KEYDOWN && sdl_event.key.keysym.sym == SDLK_ESCAPE) {
@@ -245,10 +250,7 @@ int main(int argc, char** argv) {
 						}
 					} else {
 						if (map_editor && ui_active == "mapeditor_overlay") {
-							printf("placing object\n");
-							WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
-							mapeditor_place_object();
-							ReleaseMutex(bf_rw.device_locks[0]);
+							mapeditor_process_click();
 						}
 					}
 				}
@@ -256,7 +258,6 @@ int main(int argc, char** argv) {
 		}
 
 		WaitForSingleObject(bf_assets.device_locks[0], INFINITE);
-		WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
 		bit_field_update_device(&bf_rw, 0);
 		if (game_started || map_editor) {
 			camera_move_z_tick();

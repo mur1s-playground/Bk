@@ -318,15 +318,15 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 						}
 					}
 					else if (pl->inventory[inv].item_id == 52) {
-						if (pl->health <= 75 && pl->inventory[inv].item_param != 0) {
-							//printf("healing\n");
-							pl->health += 25;
-							pl->inventory[inv].item_param--;
-						}
-						if (pl->inventory[inv].item_param == 0) {
-							pl->inventory[inv].item_id = UINT_MAX;
-							has_inv_space++;
-						}
+					if (pl->health <= 75 && pl->inventory[inv].item_param != 0) {
+						//printf("healing\n");
+						pl->health += 25;
+						pl->inventory[inv].item_param--;
+					}
+					if (pl->inventory[inv].item_param == 0) {
+						pl->inventory[inv].item_id = UINT_MAX;
+						has_inv_space++;
+					}
 					}
 				}
 
@@ -376,30 +376,33 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
 											has_inv_space--;
 										}
-									} else if (etc->model_id == 51) { //shield
-										if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
-											has_inv_space--;
-										}
-									} else if (etc->model_id == 52) { //bandage
+									}
+									else if (etc->model_id == 51) { //shield
 										if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
 											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
 											has_inv_space--;
 										}
 									}
-								} else if (etc->et == ET_PLAYER && has_gun >= 0 && pl->inventory[has_gun].item_param % 15 == 0) {
-									if (players[etc->name].health > 0 && gi == grid_get_index(bf_rw.data, gd.position_in_bf, { etc->position[0], etc->position[1], 0.0f })) {
-											pl->inventory[has_gun].item_param++;
-											float hit = (rand() / (float)RAND_MAX);
-											//printf("player: %s shoots at %s", pl->name, etc->name);
-											if (hit < 0.8) {
-												size_t pl_ptr = (size_t)&players[etc->name];
-												unsigned int pl_ptr_1 = ((unsigned int*)&pl_ptr)[0];
-												unsigned int pl_ptr_2 = ((unsigned int*)&pl_ptr)[1];
-												player_action_param_add(pl, PAT_SHOOT_AT, pl_ptr_1, pl_ptr_2);
-											}
-											//printf("\n");
+									else if (etc->model_id == 52) { //bandage
+										if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
+											player_action_param_add(pl, PAT_PICKUP_ITEM, entity_id, 0);
+											has_inv_space--;
 										}
+									}
+								}
+								else if (etc->et == ET_PLAYER && has_gun >= 0 && pl->inventory[has_gun].item_param % 15 == 0) {
+									if (players[etc->name].health > 0 && gi == grid_get_index(bf_rw.data, gd.position_in_bf, { etc->position[0], etc->position[1], 0.0f })) {
+										pl->inventory[has_gun].item_param++;
+										float hit = (rand() / (float)RAND_MAX);
+										//printf("player: %s shoots at %s", pl->name, etc->name);
+										if (hit < 0.8) {
+											size_t pl_ptr = (size_t)&players[etc->name];
+											unsigned int pl_ptr_1 = ((unsigned int*)&pl_ptr)[0];
+											unsigned int pl_ptr_2 = ((unsigned int*)&pl_ptr)[1];
+											player_action_param_add(pl, PAT_SHOOT_AT, pl_ptr_1, pl_ptr_2);
+										}
+										//printf("\n");
+									}
 								}
 							}
 						}
@@ -408,11 +411,57 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 				float delta_x = 0.0f;
 				float delta_y = 0.0f;
 
-				if (storm_next_move_time(en->position, player_dist_per_tick) == 1.0f) {
+				if (pl->move_reason == PAT_MOVE) {
+					if (sqrtf((en->position[0] - pl->move_target[0]) * (en->position[0] - pl->move_target[0]) + (en->position[1] - pl->move_target[1]) * (en->position[1] - pl->move_target[1])) < 2*player_dist_per_tick) {
+						pl->move_reason = PAT_NONE;
+					}
+				}
+				
+				bool new_move_target = false;
+				if (pl->move_reason != PAT_MOVE && storm_next_move_time(en->position, player_dist_per_tick) == 1.0f) {
 					float dist = sqrtf((storm_to.x - en->position[0]) * (storm_to.x - en->position[0]) + (storm_to.y - en->position[1]) * (storm_to.y - en->position[1])) + 1e-5;
 
-					delta_x = player_dist_per_tick * ((storm_to.x - en->position[0]) / dist);
-					delta_y = player_dist_per_tick * ((storm_to.y - en->position[1]) / dist);
+					if (pl->move_target[0] != (float)storm_to.x && pl->move_target[1] != (float)storm_to.y) {
+						pl->move_target = { (float)storm_to.x , (float)storm_to.y };
+						pl->move_reason = PAT_MOVE;
+						new_move_target = true;
+					}
+					
+					//delta_x = player_dist_per_tick * ((storm_to.x - en->position[0]) / dist);
+					//delta_y = player_dist_per_tick * ((storm_to.y - en->position[1]) / dist);
+				} else {
+					if (pl->move_reason == PAT_MOVE && pl->move_target[0] == storm_to.x && pl->move_target[1] == storm_to.y && !storm_is_in({ en->position[0], en->position[1], 0.0f })) {
+						pl->move_reason = PAT_NONE;
+					}
+				}
+
+				if (!new_move_target && pl->move_reason == PAT_PICKUP_ITEM) {
+					bool item_still_there = false;
+					int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { pl->move_target[0], pl->move_target[1], 0.0f });
+					if (gi > -1) {
+						int g_data_pos = bf_rw.data[gd.data_position_in_bf + 1 + gi];
+						if (g_data_pos > 0) {
+							int element_count = bf_rw.data[g_data_pos];
+							for (int e = 0; e < element_count; e++) {
+								unsigned int entity_id = bf_rw.data[g_data_pos + 1 + e];
+								if (entity_id != pl->entity_id && entity_id < UINT_MAX) {
+									struct entity* etc = &es[entity_id];
+									if (etc->et == ET_ITEM) {
+										if (etc->model_id == 50 && !has_gun) { //colt
+											item_still_there = true;
+											break;
+										} else {
+											item_still_there = true;
+											break;
+										}
+									}
+								}
+							}
+						}
+					}
+					if (!item_still_there) {
+						pl->move_reason = PAT_NONE;
+					}
 				}
 
 				struct vector2<float> spiral_pos = { en->position[0], en->position[1] + 32.0f };
@@ -435,24 +484,25 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 								unsigned int entity_id = bf_rw.data[g_data_pos + 1 + e];
 								if (entity_id != pl->entity_id && entity_id < UINT_MAX) {
 									struct entity* etc = &es[entity_id];
-									if (etc->et == ET_ITEM && delta_x == 0 && delta_y == 0) {
+									if (etc->et == ET_ITEM && pl->move_reason == PAT_NONE) {
 										if (!storm_is_in({ (float)spiral_pos[0], (float)spiral_pos[1], 0.0f })) {
 											if (etc->model_id == 50) { //colt
 												if (has_gun < 0) {
-													delta_x = player_dist_per_tick * ((spiral_pos[0] - en->position[0]) / dist);
-													delta_y = player_dist_per_tick * ((spiral_pos[1] - en->position[1]) / dist);
+													pl->move_target = {spiral_pos[0], spiral_pos[1]};
+													pl->move_reason = PAT_PICKUP_ITEM;
+													new_move_target = true;
 												}
-											}
-											else if (etc->model_id == 51) { // shield
+											} else if (etc->model_id == 51) { // shield
 												if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-													delta_x = player_dist_per_tick * ((spiral_pos[0] - en->position[0]) / dist);
-													delta_y = player_dist_per_tick * ((spiral_pos[1] - en->position[1]) / dist);
+													pl->move_target = { spiral_pos[0], spiral_pos[1] };
+													pl->move_reason = PAT_PICKUP_ITEM;
+													new_move_target = true;
 												}
-											}
-											else if (etc->model_id == 52) { // bandage
+											} else if (etc->model_id == 52) { // bandage
 												if ((has_gun >= 0 && has_inv_space > 0) || (has_gun < 0 && has_inv_space > 1)) {
-													delta_x = player_dist_per_tick * ((spiral_pos[0] - en->position[0]) / dist);
-													delta_y = player_dist_per_tick * ((spiral_pos[1] - en->position[1]) / dist);
+													pl->move_target = { spiral_pos[0], spiral_pos[1] };
+													pl->move_reason = PAT_PICKUP_ITEM;
+													new_move_target = true;
 												}
 											}
 										}
@@ -489,50 +539,66 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 						spiral_steps_last = spiral_steps;
 					}
 				}
+
+				if (pl->move_reason != PAT_NONE) {
+					float dist_from_target = sqrtf((pl->move_target[0] - en->position[0]) * (pl->move_target[0] - en->position[0]) + (pl->move_target[1] - en->position[1]) * (pl->move_target[1] - en->position[1])) + 1e-5;
+
+					delta_x = player_dist_per_tick * (pl->move_target[0] - en->position[0]) / dist_from_target;
+					delta_y = player_dist_per_tick * (pl->move_target[1] - en->position[1]) / dist_from_target;
+				} else {
+					float rad = (-en->orientation) / 180.0f * 3.1415f;
+					delta_x = player_dist_per_tick * -sin(rad);
+					delta_y = player_dist_per_tick * cos(rad);
+				}
+					
+				unsigned char* pathables = (unsigned char*)&bf_map.data[gm.map_pathable_position];
+				unsigned char pathable = 0; 
+				do {
+					pathable = pathables[(int)floorf(en->position[1] + delta_y) * gm.map_dimensions[0] + (int)floorf(en->position[0] + delta_x)];
+					if (pathable == 0) {
+						float min_dist = 100000;
+						int min_dist_idx = 0;
+						int min_dist_td = 0;
+						for (int pa = 1; pa < 8; pa++) {
+							float rad = pa * 45 / 180.0f * 3.1415f;
+
+							float tmp_delta_x = delta_x * cos(rad) - delta_y * sin(rad);
+							float tmp_delta_y = delta_x * sin(rad) + delta_y * cos(rad);
+							bool path_clear = true;
+							int td;
+							for (td = 1; td < 180; td++) {
+								if (floorf(en->position[1] + tmp_delta_y * td) < gm.map_dimensions[1] && floorf(en->position[0] + tmp_delta_x * td) < gm.map_dimensions[0]) {
+									if (pathables[(int)floorf(en->position[1] + tmp_delta_y * td) * gm.map_dimensions[0] + (int)floorf(en->position[0] + tmp_delta_x * td)] == 0) {
+										path_clear = false;
+										break;
+									}
+								} else {
+									break;
+								}
+							}
+							if (path_clear && td > 90) {
+								float next_dist = sqrtf((en->position[0] + tmp_delta_x - pl->move_target[0]) * (en->position[0] + tmp_delta_x - pl->move_target[0]) + (en->position[1] + tmp_delta_y - pl->move_target[1]) * (en->position[1] + tmp_delta_y - pl->move_target[1]));
+								if (next_dist < min_dist) {
+									min_dist = next_dist;
+									min_dist_idx = pa;
+									min_dist_td = td;
+								}
+							}
+						}
+						if (min_dist_idx > 0) {
+							float rad = min_dist_idx * 45 / 180.0f * 3.1415f;
+
+							delta_x = delta_x * cos(rad) - delta_y * sin(rad);
+							delta_y = delta_x * sin(rad) + delta_y * cos(rad);
+							pl->move_target = { en->position[0] + delta_x * min_dist_td, en->position[1] + delta_y * min_dist_td };
+							pl->move_reason = PAT_MOVE;
+						}
+					}
+				} while (pathable == 0);
+
 				int target_orientation = en->orientation;
-				if (delta_x == 0 && delta_y == 0) {
-					if (rand() / (float)RAND_MAX < 0.1) {
-						int fac = 1;
-						if (rand() / (float)RAND_MAX < 0.20) fac = -1;
-						en->orientation += 3 * fac;
-					}
-					delta_x = -1 * player_dist_per_tick * cos(3.1415 / 180.0f * (en->orientation + 90));
-					delta_y = -1 * player_dist_per_tick * sin(3.1415 / 180.0f * (en->orientation - 90));
-
-					if (en->position[0] + delta_x < 32) {
-						delta_x = 0.0f;
-						delta_y = 0.0f;
-						target_orientation = 45 + (int)(rand() / (float)RAND_MAX * 90);
-						en->orientation = target_orientation;
-					}
-					if (en->position[0] + delta_x >= gm.map_dimensions[0] - 32) {
-						delta_x = 0.0f;
-						delta_y = 0.0f;
-						target_orientation = 315 - (int)(rand() / (float)RAND_MAX * 90);
-						en->orientation = target_orientation;
-					}
-					if (en->position[1] + delta_y < 32) {
-						delta_x = 0.0f;
-						delta_y = 0.0f;
-						target_orientation = 315 + (int)(rand() / (float)RAND_MAX * 90);
-						en->orientation = target_orientation;
-					}
-					if (en->position[1] + delta_y >= gm.map_dimensions[1] - 32) {
-						delta_x = 0.0f;
-						delta_y = 0.0f;
-						target_orientation = 135 + (int)(rand() / (float)RAND_MAX * 90);
-						en->orientation = target_orientation;
-					}
-
-					if (storm_is_in({ en->position[0] + delta_x, en->position[1] + delta_y, 0.0f })) {
-						delta_x = 0.0f;
-						delta_y = 0.0f;
-						target_orientation += 3;
-					}
-				}
-				else {
-					target_orientation = (int)roundf(atan2(-delta_y, delta_x) * (180 / 3.1415f)) + 90;
-				}
+				target_orientation = (int)roundf(atan2(-delta_y, delta_x) * (180 / 3.1415f)) + 90;
+				
 				if (target_orientation < 0) {
 					target_orientation += 360;
 				}
@@ -540,16 +606,13 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					if (target_orientation > en->orientation) {
 						if (abs(en->orientation + 360 - target_orientation) < abs(target_orientation - en->orientation)) {
 							en->orientation -= orientation_change_per_tick;
-						}
-						else {
+						} else {
 							en->orientation += orientation_change_per_tick;
 						}
-					}
-					else {
+					} else {
 						if (abs(en->orientation - (target_orientation + 360)) < abs(en->orientation - target_orientation)) {
 							en->orientation += orientation_change_per_tick;
-						}
-						else {
+						} else {
 							en->orientation -= orientation_change_per_tick;
 						}
 					}
@@ -687,6 +750,7 @@ void game_tick() {
 														pl->inventory[inv].item_id = 50;
 														pl->inventory[inv].item_param = 5;
 														grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[0].model_scale, item_models[0].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[0]), item_entity_id);
+														pl->move_reason = PAT_NONE;
 														break;
 													}
 												}
@@ -699,6 +763,7 @@ void game_tick() {
 													pl->inventory[inv].item_id = 51;
 													pl->inventory[inv].item_param = 2;
 													grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[1].model_scale, item_models[1].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[1]), item_entity_id);
+													pl->move_reason = PAT_NONE;
 													break;
 												}
 											}
@@ -710,6 +775,7 @@ void game_tick() {
 													pl->inventory[inv].item_id = 52;
 													pl->inventory[inv].item_param = 5;
 													grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[2].model_scale, item_models[2].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[2]), item_entity_id);
+													pl->move_reason = PAT_NONE;
 													break;
 												}
 											}

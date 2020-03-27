@@ -419,6 +419,11 @@ void ui_init(struct bit_field* bf_assets, struct bit_field *bf_rw) {
                     } else {
                         config[0] = 0;
                     }
+                    if (kv_pairs[i + 4].first == kv_pairs[i].second + "_cgroup") {
+                        string first = kv_pairs[i + 4].second;
+                        first = trim(first);
+                        config[1] = stoi(first);
+                    }
                     printf("adding checkbox %s\n", t.name.c_str());
                     u.ui_elements.push_back(t);
                 }
@@ -699,11 +704,25 @@ bool ui_process_click(struct bit_field *bf_rw, unsigned int x, unsigned int y) {
                 }
             } else if (active_elements[i].uet == UET_CHECKBOX) {
                 struct ui_element* uies = (struct ui_element*) &bf_rw->data[ui_elements_position[ui_active]];
+                unsigned int cgroup = ui_value_get_int_from_eid(bf_rw, ui_active, i, 1);
                 if (ui_value_get_int_from_eid(bf_rw, ui_active, i, 0) == 0) {
                     ui_value_as_config_by_eid(bf_rw, ui_active, i, 0, 1);
                 } else {
-                    ui_value_as_config_by_eid(bf_rw, ui_active, i, 0, 0);
+                    if (cgroup == 0) {
+                        ui_value_as_config_by_eid(bf_rw, ui_active, i, 0, 0);
+                    }
                 }
+                if (cgroup > 0) {
+                    for (int sf = 0; sf < active_elements.size(); sf++) {
+                        if (sf != i && active_elements[sf].uet == UET_CHECKBOX && ui_value_get_int_from_eid(bf_rw, ui_active, sf, 1) == cgroup) {
+                            if (ui_value_get_int_from_eid(bf_rw, ui_active, sf, 0) == 1) {
+                                ui_value_as_config_by_eid(bf_rw, ui_active, sf, 0, 0);
+                                break;
+                            }
+                        }
+                    }
+                }
+                break;
             } else if (active_elements[i].uet == UET_TEXTFIELD) {
 
             } else if (active_elements[i].uet == UET_SCROLLLIST) {
