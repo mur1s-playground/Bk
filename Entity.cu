@@ -88,7 +88,7 @@ __device__ float getInterpixel(const unsigned char* frame, const unsigned int wi
 
 __global__ void draw_entities_kernel(
         const unsigned int* device_data_assets, const unsigned int* device_data_map, const unsigned int players_models_position, const unsigned int item_models_position, const unsigned int map_models_position, const unsigned int font_position,
-        const unsigned int* device_data_rw, const unsigned int entities_position, const unsigned int gd_position_in_bf, const unsigned int gd_data_position_in_bf,
+        const unsigned int* device_data_rw, const unsigned int entities_position, const unsigned int selected_player_eid, const unsigned int gd_position_in_bf, const unsigned int gd_data_position_in_bf,
         const struct vector2<unsigned int> map_dimensions_center,
         const unsigned int map_pathables, const unsigned char draw_pathing, const struct vector2<unsigned int> pathing_brushsize,
         unsigned int* device_data_output, const unsigned int output_position, const unsigned int output_width, const unsigned int output_height, const unsigned int output_channels,
@@ -497,13 +497,9 @@ __global__ void draw_entities_kernel(
 
                                         float interpixel_alpha = getInterpixel(p_model, m->model_dimensions[0] * upscale_fac, m->model_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, 3);
                                         if (interpixel_alpha > 0) {
-                                            /*
-                                            if (m->mt == MT_PLAYER && interpixel_alpha < 255) {
-                                                if (abs(current_mouse_game_x - entities[entity_id].position[0]) <= 32 && abs(current_mouse_game_y - entities[entity_id].position[1]) <= 32) {
-                                                    output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - interpixel_alpha) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (interpixel_alpha / 255.0f) * 200));
-                                                }
+                                            if (m->mt == MT_PLAYER && selected_player_eid == entity_id && interpixel_alpha < 255) {
+                                                output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = 255;// (unsigned char)(((255 - interpixel_alpha) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (interpixel_alpha / 255.0f) * 200));
                                             }
-                                            */
                                             float interpixel = getInterpixel(p_model, m->model_dimensions[0] * upscale_fac, m->model_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, current_channel);
                                             output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - interpixel_alpha) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (interpixel_alpha / 255.0f) * interpixel));
                                         }
@@ -545,7 +541,7 @@ void launch_draw_entities_kernel(
     int blocksPerGrid = (output_width * output_height * 3 + threadsPerBlock - 1) / threadsPerBlock;
 
     draw_entities_kernel << <blocksPerGrid, threadsPerBlock >> > (device_data_assets, device_data_map, players_models_position, item_models_position, map_models_position, font_position,
-                                device_data_rw, entities_position, gd_position_in_bf, gd_data_position_in_bf,
+                                device_data_rw, entities_position, player_selected_id, gd_position_in_bf, gd_data_position_in_bf,
                                 gm.map_dimensions,
                                 gm.map_pathable_position, mapeditor_action_type, mapeditor_pathing_brushsize,
                                 device_data_output, output_position, output_width, output_height, output_channels, 

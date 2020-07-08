@@ -36,6 +36,8 @@ DWORD WINAPI game_thread(LPVOID param) {
 	while (running) {
 
 		if (game_setup) {
+			WaitForSingleObject(bf_assets.device_locks[0], INFINITE);
+			WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
 			game_init();
 			game_start();
 			camera_get_crop(camera_crop);
@@ -43,6 +45,8 @@ DWORD WINAPI game_thread(LPVOID param) {
 			game_ticks = 0;
 			game_started = true;
 			game_setup = false;
+			ReleaseMutex(bf_rw.device_locks[0]);
+			ReleaseMutex(bf_assets.device_locks[0]);
 		} else if (game_started) {
 			WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
 			game_tick();
@@ -156,9 +160,9 @@ void game_start() {
 		//object itself
 		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, cur_e->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, max_pos, entities.size() - 1);
 		//object text
-		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { cur_e->position[0] - 32.0f - 3, cur_e->position[1] - 32.0f - 3, cur_e->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { cur_e->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, entities.size() - 1);
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { cur_e->position[0] - 32.0f - 3, cur_e->position[1] - 32.0f - 3, cur_e->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { cur_e->name_len * 32.0f + 64.0f + 3, 96.0f + 3, 0 }, entities.size() - 1);
 		//object inventory
-		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { cur_e->position[0] - 32.0f - 3, cur_e->position[1], cur_e->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, entities.size() - 1);
+		grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { cur_e->position[0] - 32.0f - 3, cur_e->position[1], cur_e->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 3, 0 }, entities.size() - 1);
 		pl_it->second.entity_id = entities.size() - 1;
 
 		i++;
@@ -411,7 +415,13 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 				float delta_x = 0.0f;
 				float delta_y = 0.0f;
 
-				if (pl->move_reason == PAT_MOVE) {
+				if (pl->move_path_active_id < pl->move_path_len) {
+					if (sqrtf((en->position[0] - pl->move_path[pl->move_path_active_id][0]) * (en->position[0] - pl->move_path[pl->move_path_active_id][0]) + (en->position[1] - pl->move_path[pl->move_path_active_id][1]) * (en->position[1] - pl->move_path[pl->move_path_active_id][1])) < 2 * player_dist_per_tick) {
+						pl->move_path_active_id++;
+					}
+				}
+
+				if (pl->move_reason != PAT_NONE) {
 					if (sqrtf((en->position[0] - pl->move_target[0]) * (en->position[0] - pl->move_target[0]) + (en->position[1] - pl->move_target[1]) * (en->position[1] - pl->move_target[1])) < 2*player_dist_per_tick) {
 						pl->move_reason = PAT_NONE;
 					}
@@ -430,9 +440,11 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					//delta_x = player_dist_per_tick * ((storm_to.x - en->position[0]) / dist);
 					//delta_y = player_dist_per_tick * ((storm_to.y - en->position[1]) / dist);
 				} else {
+					/*
 					if (pl->move_reason == PAT_MOVE && pl->move_target[0] == storm_to.x && pl->move_target[1] == storm_to.y && !storm_is_in({ en->position[0], en->position[1], 0.0f })) {
 						pl->move_reason = PAT_NONE;
 					}
+					*/
 				}
 
 				if (!new_move_target && pl->move_reason == PAT_PICKUP_ITEM) {
@@ -539,62 +551,210 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 						spiral_steps_last = spiral_steps;
 					}
 				}
-
-				if (pl->move_reason != PAT_NONE) {
-					float dist_from_target = sqrtf((pl->move_target[0] - en->position[0]) * (pl->move_target[0] - en->position[0]) + (pl->move_target[1] - en->position[1]) * (pl->move_target[1] - en->position[1])) + 1e-5;
-
-					delta_x = player_dist_per_tick * (pl->move_target[0] - en->position[0]) / dist_from_target;
-					delta_y = player_dist_per_tick * (pl->move_target[1] - en->position[1]) / dist_from_target;
-				} else {
-					float rad = (-en->orientation) / 180.0f * 3.1415f;
-					delta_x = player_dist_per_tick * -sin(rad);
-					delta_y = player_dist_per_tick * cos(rad);
-				}
 					
 				unsigned char* pathables = (unsigned char*)&bf_map.data[gm.map_pathable_position];
-				unsigned char pathable = 0; 
-				do {
-					pathable = pathables[(int)floorf(en->position[1] + delta_y) * gm.map_dimensions[0] + (int)floorf(en->position[0] + delta_x)];
-					if (pathable == 0) {
-						float min_dist = 100000;
-						int min_dist_idx = 0;
-						int min_dist_td = 0;
-						for (int pa = 1; pa < 8; pa++) {
-							float rad = pa * 45 / 180.0f * 3.1415f;
+				unsigned char pathable = 0;
 
-							float tmp_delta_x = delta_x * cos(rad) - delta_y * sin(rad);
-							float tmp_delta_y = delta_x * sin(rad) + delta_y * cos(rad);
-							bool path_clear = true;
-							int td;
-							for (td = 1; td < 180; td++) {
-								if (floorf(en->position[1] + tmp_delta_y * td) < gm.map_dimensions[1] && floorf(en->position[0] + tmp_delta_x * td) < gm.map_dimensions[0]) {
-									if (pathables[(int)floorf(en->position[1] + tmp_delta_y * td) * gm.map_dimensions[0] + (int)floorf(en->position[0] + tmp_delta_x * td)] == 0) {
-										path_clear = false;
+				if (player_move_target_override_set.load()) {
+					if (player_selected_id == pl->entity_id) {
+						//printf("overriding\n");
+						pl->move_target = { player_move_target_override[0], player_move_target_override[1] };
+						pl->move_reason = PAT_MOVE;
+						pl->move_path_active_id = 10;
+						pl->move_path_len = 10;
+						player_move_target_override_set.store(false);
+					}
+				}
+
+				if (pathables[(int)floorf(pl->move_target[1]) * gm.map_dimensions[0] + (int)floorf(pl->move_target[0])] == 0) {
+					pl->move_reason = PAT_NONE;
+				}
+
+				if (pl->move_reason == PAT_NONE) {
+					pl->move_target = { (float)storm_to.x , (float)storm_to.y };
+					float dist = sqrtf((en->position[0] - pl->move_target[0]) * (en->position[0] - pl->move_target[0]) + (en->position[1] - pl->move_target[1]) * (en->position[1] - pl->move_target[1]));
+					pl->move_target = { en->position[0] + 256.0f/dist * ((float)storm_to.x - en->position[0]), en->position[1] + 256.0f / dist * ((float)storm_to.y - en->position[1]) };
+					pl->move_path_len = 10;
+					pl->move_path_active_id = 10;
+					pl->move_reason = PAT_MOVE;
+				}
+				
+				if (pl->move_path_active_id == pl->move_path_len) {
+					//(partial) path to target
+					pl->move_path_len = 10;
+					//printf("searching path from %f %f to %f %f, %i\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1], pl->move_reason);
+					float dist = sqrtf((en->position[0] - pl->move_target[0]) * (en->position[0] - pl->move_target[0]) + (en->position[1] - pl->move_target[1]) * (en->position[1] - pl->move_target[1]));
+					float cl_dist = min(dist, 256.0f);
+					vector2<float> partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1]) };
+					while (pathables[(int)floorf(partial_target[1]) * gm.map_dimensions[0] + (int)floorf(partial_target[0])] == 0 && cl_dist > 10.0f) {
+						cl_dist -= 10.0f;
+						partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1]) };
+						//printf("closer\n");
+					}
+					//printf("closer %f %f %f\n", partial_target[0], partial_target[1], cl_dist);
+
+					vector2<float> partial_target_dir = { partial_target[0] - en->position[0], partial_target[1] - en->position[1] };
+					float partial_target_dir_norm = sqrtf(partial_target_dir[0] * partial_target_dir[0] + partial_target_dir[1] * partial_target_dir[1]);
+					vector2<float> partial_target_dir_orth = { -partial_target_dir[1]/ partial_target_dir_norm, partial_target_dir[0]/ partial_target_dir_norm };
+
+					vector2<float> best_move_path_candidate[10];
+
+					for (int i = 0; i < 10; i++) {
+						pl->move_path[i][0] = en->position[0] + (i / 9.0f) * partial_target_dir[0];
+						pl->move_path[i][1] = en->position[1] + (i / 9.0f) * partial_target_dir[1];
+						best_move_path_candidate[i][0] = pl->move_path[i][0];
+						best_move_path_candidate[i][1] = pl->move_path[i][1];
+					}
+					
+					float path_clear = false;
+					int shift_indicator = -1;
+					float shift_param = 0.0f;
+					int path_unclear_pp = -1;
+
+					pl->move_path_active_id = 1;
+
+					while (!path_clear) {
+						path_clear = true;
+						//printf("not clear loop\n");
+						for (int pp = 0; pp < 9; pp++) {
+							float t_dist;
+							vector2<float> cur_pos = { pl->move_path[pp][0], pl->move_path[pp][1]};
+							float stepcount = 16.0f;
+							int loop = 1;
+							//TODO:: CHECK THE WHILE CONDITION
+							while ((t_dist = sqrtf((pl->move_path[pp+1][0] - cur_pos[0]) * (pl->move_path[pp + 1][0] - cur_pos[0]) + (pl->move_path[pp + 1][1] - cur_pos[1]) * (pl->move_path[pp + 1][1] - cur_pos[1]))) > 0.0f) {
+								cur_pos[0] = pl->move_path[pp][0] + (loop/stepcount) * (pl->move_path[pp + 1][0] - pl->move_path[pp][0]);
+								cur_pos[1] = pl->move_path[pp][1] + (loop/stepcount) * (pl->move_path[pp + 1][1] - pl->move_path[pp][1]);
+								loop++;
+								//cur_pos[1] = pl->move_path[pp + 1][1];
+
+								if (pathables[(int)floorf(cur_pos[1]) * gm.map_dimensions[0] + (int)floorf(cur_pos[0])] == 0) {
+									//printf("pl_eid %i, pp %i, not pathable %f %f\n", pl->entity_id, pp, cur_pos[0], cur_pos[1]);
+									/*
+									if (pp < path_unclear_pp) {
+										//walk current best, till past where it broke
+										for (int pp_t = 0; pp_t < path_unclear_pp; pp_t++) {
+											pl->move_path[pp_t][0] = best_move_path_candidate[pp_t][0];
+											pl->move_path[pp_t][1] = best_move_path_candidate[pp_t][1];
+										}
+										pl->move_path_len = pp;
 										break;
-									}
-								} else {
+									} else {
+										if (pp > path_unclear_pp && path_unclear_pp > 0) {
+											//walk current partially, till 1 segment past where it broke before optimising
+											pl->move_path_len = path_unclear_pp;
+										} else {
+											//optimise further*/
+											for (int pp_t = 0; pp_t < pp; pp_t++) {
+												best_move_path_candidate[pp_t][0] = pl->move_path[pp_t][0];
+												best_move_path_candidate[pp_t][1] = pl->move_path[pp_t][1];
+											}
+											path_unclear_pp = pp;
+											path_clear = false;
+										//}
+									//}
 									break;
 								}
 							}
-							if (path_clear && td > 90) {
-								float next_dist = sqrtf((en->position[0] + tmp_delta_x - pl->move_target[0]) * (en->position[0] + tmp_delta_x - pl->move_target[0]) + (en->position[1] + tmp_delta_y - pl->move_target[1]) * (en->position[1] + tmp_delta_y - pl->move_target[1]));
-								if (next_dist < min_dist) {
-									min_dist = next_dist;
-									min_dist_idx = pa;
-									min_dist_td = td;
+							if (!path_clear) {
+								break;
+							}
+						}
+						if (!path_clear) {
+							bool path_valid = false;
+							while (!path_valid) {
+								path_valid = true;
+								if (shift_indicator < 0) {
+									shift_indicator = 1;
+									//printf("switching indicator %i\n", shift_indicator);
+								} else {
+									shift_indicator = -1;
+									shift_param += 2.0f;
+									//printf("increasing shift param %f\n", shift_param);
+									if (shift_param > 256) {
+										if (cl_dist > 10.0f) {
+											cl_dist /= 2.0f;
+											shift_param = 0.0f;
+											partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1]) };
+											while (pathables[(int)floorf(partial_target[1]) * gm.map_dimensions[0] + (int)floorf(partial_target[0])] == 0 && cl_dist > 10.0f) {
+												cl_dist /= 2.0f;
+												partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1]) };
+												//printf("closer\n");
+											}
+											if (pathables[(int)floorf(partial_target[1]) * gm.map_dimensions[0] + (int)floorf(partial_target[0])] == 1) {
+												partial_target_dir = { partial_target[0] - en->position[0], partial_target[1] - en->position[1] };
+												partial_target_dir_norm = sqrtf(partial_target_dir[0] * partial_target_dir[0] + partial_target_dir[1] * partial_target_dir[1]);
+												partial_target_dir_orth = { -partial_target_dir[1] / partial_target_dir_norm, partial_target_dir[0] / partial_target_dir_norm };
+												for (int i = 0; i < 10; i++) {
+													pl->move_path[i][0] = en->position[0] + (i / 9.0f) * partial_target_dir[0];
+													pl->move_path[i][1] = en->position[1] + (i / 9.0f) * partial_target_dir[1];
+													best_move_path_candidate[i][0] = pl->move_path[i][0];
+													best_move_path_candidate[i][1] = pl->move_path[i][1];
+												}
+											} else {
+												//printf("path not found from %f %f to %f %f\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1]);
+												pl->move_path[0][0] = en->position[0];
+												pl->move_path[0][1] = en->position[1];
+												pl->move_path[1][0] = en->position[0];
+												pl->move_path[1][1] = en->position[1];
+												pl->move_path_active_id = 1;
+												pl->move_path_len = 2;
+												pl->move_target = { en->position[0], en->position[1] };
+												pl->move_reason = PAT_MOVE;
+												path_clear = true;
+												break;
+											}
+										} else {
+											//printf("path not found from %f %f to %f %f\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1]);
+											pl->move_path[0][0] = en->position[0];
+											pl->move_path[0][1] = en->position[1];
+											pl->move_path[1][0] = en->position[0];
+											pl->move_path[1][1] = en->position[1];
+											pl->move_path_active_id = 1;
+											pl->move_path_len = 2;
+											pl->move_target = { en->position[0], en->position[1] };
+											pl->move_reason = PAT_MOVE;
+											path_clear = true;
+											break;
+										}
+									}
+								}
+								for (int i = 0; i < 10; i++) {
+									float sin_tilde = 0.0f;
+									if (i <= path_unclear_pp) {
+										if (path_unclear_pp == 0) {
+											sin_tilde = 0;
+										} else {
+											float way_to_pi = i / ((float)path_unclear_pp) * 3.1415f / 2.0f;
+											sin_tilde = sin(way_to_pi);
+										}
+									} else {
+										if (path_unclear_pp == 8) {
+											sin_tilde = 0;
+										} else {
+											float way_from_pi = (9 - i) / ((float)(9 - path_unclear_pp - 1)) * 3.1415f/2.0f;
+											sin_tilde = sin(way_from_pi);
+										}
+									}
+									pl->move_path[i][0] = en->position[0] + (i / 9.0f) * partial_target_dir[0] + shift_param * sin_tilde * partial_target_dir_orth[0] * shift_indicator;
+									pl->move_path[i][1] = en->position[1] + (i / 9.0f) * partial_target_dir[1] + shift_param * sin_tilde * partial_target_dir_orth[1] * shift_indicator;
+									//printf("%i pu_pp %i, sin_tilde: %f, x,y: %f, %f\n", i, path_unclear_pp, sin_tilde, pl->move_path[i][0], pl->move_path[i][1]);
+									if (pl->move_path[i][0] < 0 || pl->move_path[i][0] >= gm.map_dimensions[0] || pl->move_path[i][1] < 0 || pl->move_path[i][1] >= gm.map_dimensions[1]) {
+										path_valid = false;
+										break;
+									}
 								}
 							}
 						}
-						if (min_dist_idx > 0) {
-							float rad = min_dist_idx * 45 / 180.0f * 3.1415f;
-
-							delta_x = delta_x * cos(rad) - delta_y * sin(rad);
-							delta_y = delta_x * sin(rad) + delta_y * cos(rad);
-							pl->move_target = { en->position[0] + delta_x * min_dist_td, en->position[1] + delta_y * min_dist_td };
-							pl->move_reason = PAT_MOVE;
-						}
 					}
-				} while (pathable == 0);
+				}
+				
+				vector2<float> active_target = { pl->move_path[pl->move_path_active_id][0], pl->move_path[pl->move_path_active_id][1] };
+
+				float dist_from_target = sqrtf((active_target[0] - en->position[0]) * (active_target[0] - en->position[0]) + (active_target[1] - en->position[1]) * (active_target[1] - en->position[1])) + 1e-5;
+
+				delta_x = player_dist_per_tick * (active_target[0] - en->position[0]) / dist_from_target;
+				delta_y = player_dist_per_tick * (active_target[1] - en->position[1]) / dist_from_target;
 
 				int target_orientation = en->orientation;
 				target_orientation = (int)roundf(atan2(-delta_y, delta_x) * (180 / 3.1415f)) + 90;
@@ -665,9 +825,9 @@ void game_tick() {
 						//object itself
 						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, en->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl->entity_id);
 						//object text
-						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 64.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
 						//object inventory
-						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, pl->entity_id);
+						grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 3, 0 }, pl->entity_id);
 
 						float delta_x = *((float*)&pap_start[1]);
 						float delta_y = *((float*)&pap_start[2]);
@@ -680,11 +840,11 @@ void game_tick() {
 						es = (struct entity*) & bf_rw.data[entities_position];
 						en = (struct entity*) & es[pl->entity_id];
 						//object text
-						grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
+						grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1] - 32.0f - 3, en->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { en->name_len * 32.0f + 64.0f + 3, 96.0f + 3, 0 }, pl->entity_id);
 						es = (struct entity*) & bf_rw.data[entities_position];
 						en = (struct entity*) & es[pl->entity_id];
 						//object inventory
-						grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, pl->entity_id);
+						grid_object_add(&bf_rw, bf_rw.data, gd.position_in_bf, { en->position[0] - 32.0f - 3, en->position[1], en->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 3, 0 }, pl->entity_id);
 						es = (struct entity*) & bf_rw.data[entities_position];
 						en = (struct entity*) & es[pl->entity_id];
 					}
@@ -711,9 +871,9 @@ void game_tick() {
 							//object itself
 							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, target_entity->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl_target->entity_id);
 							//object text
-							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { target_entity->position[0] - 32.0f - 3, target_entity->position[1] - 32.0f - 3, target_entity->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { target_entity->name_len * 32.0f + 32.0f + 3, 96.0f + 3, 0 }, pl_target->entity_id);
+							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { target_entity->position[0] - 32.0f - 3, target_entity->position[1] - 32.0f - 3, target_entity->position[2] - 0.0f }, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, { target_entity->name_len * 32.0f + 64.0f + 3, 96.0f + 3, 0 }, pl_target->entity_id);
 							//object inventory
-							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { target_entity->position[0] - 32.0f - 3, target_entity->position[1], target_entity->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 6, 0 }, pl_target->entity_id);
+							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, { target_entity->position[0] - 32.0f - 3, target_entity->position[1], target_entity->position[2] - 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 32.0f, 32.0f * 3, 0 }, pl_target->entity_id);
 							pl_target->entity_id = UINT_MAX;
 
 							pl->kills++;

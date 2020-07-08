@@ -142,15 +142,18 @@ void mapeditor_init() {
 
 	printf("updating assets players\n");
 	bit_field_update_device(&bf_assets, 0);
+	printf("updated assets players\n");
 }
 
 void mapeditor_process_click() {
+	WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
 	if (mapeditor_action_type == 0) {
 		printf("placing object\n");
 		mapeditor_place_object();
 	} else if (mapeditor_action_type == 1){
 		mapeditor_draw_pathing();
 	}
+	ReleaseMutex(bf_rw.device_locks[0]);
 }
 
 void mapeditor_place_object() {

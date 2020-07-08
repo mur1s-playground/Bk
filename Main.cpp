@@ -74,6 +74,7 @@ int main(int argc, char** argv) {
 	unsigned int output_position;
 
 	srand(time(nullptr));
+	rand(); rand(); rand();
 
 	//bit field uploaded "once"
 	bit_field_init(&bf_assets, 16, 1024);
@@ -190,7 +191,6 @@ int main(int argc, char** argv) {
 	while (running) {
 		long tf_l = clock();
 
-		WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
 		while (SDL_PollEvent(&sdl_event) != 0) {
 			if (game_started || map_editor) {
 				if (sdl_event.type == SDL_KEYDOWN && sdl_event.key.keysym.sym == SDLK_ESCAPE) {
@@ -230,6 +230,8 @@ int main(int argc, char** argv) {
 				mouse_position[1] = sdl_event.motion.y;
 			}
 
+			vector2<unsigned int> current_mouse_game_position = { camera_crop[0] + (unsigned int)(mouse_position[0] * camera[2]), camera_crop[2] + (unsigned int)(mouse_position[1] * camera[2]) };
+
 			if (ui_active != "") {
 				if (sdl_event.type == SDL_MOUSEBUTTONUP && sdl_event.button.button == SDL_BUTTON(SDL_BUTTON_LEFT)) {
 					//printf("clicking %i %i\n", mouse_position[0], mouse_position[1]);
@@ -253,12 +255,18 @@ int main(int argc, char** argv) {
 							mapeditor_process_click();
 						}
 					}
+					players_process_left_click(current_mouse_game_position);
+				} 
+				if (sdl_event.type == SDL_MOUSEBUTTONUP && sdl_event.button.button == 3) {
+					players_process_right_click(current_mouse_game_position);
 				}
 			}
 		}
 
 		WaitForSingleObject(bf_assets.device_locks[0], INFINITE);
+		WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
 		bit_field_update_device(&bf_rw, 0);
+
 		if (game_started || map_editor) {
 			camera_move_z_tick();
 			camera_get_crop(camera_crop);

@@ -153,7 +153,7 @@ bool storm_is_in(vector3<float> position) {
 float storm_next_move_time(vector3<float> position, float dist_per_tick) {
 	float dist = sqrtf((position[0] + 16 - storm_to.x) * (position[0] + 16 - storm_to.x) + (position[1] + 16 - storm_to.y) * (position[1] + 16 - storm_to.y)) + 1e-5;
 	float dist_to_next_circle =  dist - storm_to.radius;
-	if (dist_to_next_circle < -16.0f) {
+	if (dist_to_next_circle < -32.0f) {
 		return 0.0f;
 	} else {
 		for (int i = storm_phase_time; i < storm_phase_start_ticks[storm_phase_current] + storm_phase_duration_ticks[storm_phase_current]; i++) {
@@ -162,8 +162,8 @@ float storm_next_move_time(vector3<float> position, float dist_per_tick) {
 			float delta_x = dist_per_tick * ((storm_to.x - position[0]) / dist);
 			float delta_y = dist_per_tick * ((storm_to.y - position[1]) / dist);
 
-			float p_x_at_i = position[0] + 16 + (i-storm_phase_time) * delta_x;
-			float p_y_at_i = position[1] + 16 + (i-storm_phase_time) * delta_y;
+			float p_x_at_i = position[0] + 32 + (i-storm_phase_time) * delta_x;
+			float p_y_at_i = position[1] + 32 + (i-storm_phase_time) * delta_y;
 
 			float storm_x_at_i;
 			float storm_y_at_i;
@@ -183,9 +183,9 @@ float storm_next_move_time(vector3<float> position, float dist_per_tick) {
 			}
 			float dist_from_center = sqrtf((p_x_at_i - storm_x_at_i) * (p_x_at_i - storm_x_at_i) + (p_y_at_i - storm_y_at_i) * (p_y_at_i - storm_y_at_i));
 			float dist_from_target_center = sqrtf((p_x_at_i - storm_to.x) * (p_x_at_i - storm_to.x) + (p_y_at_i - storm_to.y) * (p_y_at_i - storm_to.y));
-			if (dist_from_center >= storm_radius_at_i - 16.0f) {
+			if (dist_from_center >= storm_radius_at_i - 32.0f) {
 				return 1.0f;
-			} else if (dist_from_target_center < storm_to.radius - 16.0f) {
+			} else if (dist_from_target_center < storm_to.radius - 32.0f) {
 				return 0.0f;
 			}
 		}
@@ -198,6 +198,7 @@ float storm_next_move_time(vector3<float> position, float dist_per_tick) {
 		}
 		*/
 	}
+	
 	return 0.0f;
 }
 
