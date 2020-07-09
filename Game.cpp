@@ -487,7 +487,9 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 				while (spiral_steps < 10) {
 					//process grid
 					int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { spiral_pos[0], spiral_pos[1], 0.0f });
-					if (gi > -1) {
+					//TODO: why does the boundary check on the grid not work?
+									//-----------------------------------------------------------------------------------------------------------------------//
+					if (gi > -1 && (spiral_pos[0] >= 0 && spiral_pos[0] < gm.map_dimensions[0] && spiral_pos[1] >= 0 && spiral_pos[1] < gm.map_dimensions[1] )) {
 						int g_data_pos = bf_rw.data[gd.data_position_in_bf + 1 + gi];
 						if (g_data_pos > 0) {
 							float dist = sqrtf((spiral_pos[0] - en->position[0]) * (spiral_pos[0] - en->position[0]) + (spiral_pos[1] - en->position[1]) * (spiral_pos[1] - en->position[1])) + 1e-5;
@@ -585,16 +587,16 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					//printf("searching path from %f %f to %f %f, %i\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1], pl->move_reason);
 					float dist = sqrtf((en->position[0] - pl->move_target[0]) * (en->position[0] - pl->move_target[0]) + (en->position[1] - pl->move_target[1]) * (en->position[1] - pl->move_target[1]));
 					float cl_dist = min(dist, 256.0f);
-					vector2<float> partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1]) };
+					vector2<float> partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1])};
 					while (pathables[(int)floorf(partial_target[1]) * gm.map_dimensions[0] + (int)floorf(partial_target[0])] == 0 && cl_dist > 10.0f) {
 						cl_dist -= 10.0f;
-						partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1]) };
+						partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1])};
 						//printf("closer\n");
 					}
 					//printf("closer %f %f %f\n", partial_target[0], partial_target[1], cl_dist);
 
 					vector2<float> partial_target_dir = { partial_target[0] - en->position[0], partial_target[1] - en->position[1] };
-					float partial_target_dir_norm = sqrtf(partial_target_dir[0] * partial_target_dir[0] + partial_target_dir[1] * partial_target_dir[1]);
+					float partial_target_dir_norm = sqrtf(partial_target_dir[0] * partial_target_dir[0] + partial_target_dir[1] * partial_target_dir[1]) + 1e-5;
 					vector2<float> partial_target_dir_orth = { -partial_target_dir[1]/ partial_target_dir_norm, partial_target_dir[0]/ partial_target_dir_norm };
 
 					vector2<float> best_move_path_candidate[10];
@@ -609,6 +611,8 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					float path_clear = false;
 					int shift_indicator = -1;
 					float shift_param = 0.0f;
+					float shift_param_o = 0.0f;
+					float shift_param_o2 = 0.0f;
 					int path_unclear_pp = -1;
 
 					pl->move_path_active_id = 1;
@@ -671,19 +675,31 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 									shift_indicator = -1;
 									shift_param += 2.0f;
 									//printf("increasing shift param %f\n", shift_param);
-									if (shift_param > 256) {
+									if (shift_param > 256 && shift_param_o < 64) {
+										shift_param = 0.0f;
+										shift_param_o += 4.0f;
+									}
+									if (shift_param > 256 && shift_param_o >= 64 && shift_param_o2 < 64) {
+										shift_param = 0.0f;
+										shift_param_o = 0.0f;
+										shift_param_o2 += 4.0f;
+									}
+									if (shift_param > 256 && shift_param_o >= 64 && shift_param_o2 >= 64) {
 										if (cl_dist > 10.0f) {
 											cl_dist /= 2.0f;
 											shift_param = 0.0f;
-											partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1]) };
+											shift_param_o = 0.0f;
+											shift_param_o2 = 0.0f;
+											shift_indicator = -1;
+											partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1])};
 											while (pathables[(int)floorf(partial_target[1]) * gm.map_dimensions[0] + (int)floorf(partial_target[0])] == 0 && cl_dist > 10.0f) {
 												cl_dist /= 2.0f;
-												partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1]) };
+												partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1])};
 												//printf("closer\n");
 											}
-											if (pathables[(int)floorf(partial_target[1]) * gm.map_dimensions[0] + (int)floorf(partial_target[0])] == 1) {
+											if (pathables[(int)floorf(partial_target[1]) * gm.map_dimensions[0] + (int)floorf(partial_target[0])] != 0) {
 												partial_target_dir = { partial_target[0] - en->position[0], partial_target[1] - en->position[1] };
-												partial_target_dir_norm = sqrtf(partial_target_dir[0] * partial_target_dir[0] + partial_target_dir[1] * partial_target_dir[1]);
+												partial_target_dir_norm = sqrtf(partial_target_dir[0] * partial_target_dir[0] + partial_target_dir[1] * partial_target_dir[1]) + 1e-5;
 												partial_target_dir_orth = { -partial_target_dir[1] / partial_target_dir_norm, partial_target_dir[0] / partial_target_dir_norm };
 												for (int i = 0; i < 10; i++) {
 													pl->move_path[i][0] = en->position[0] + (i / 9.0f) * partial_target_dir[0];
@@ -692,7 +708,7 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 													best_move_path_candidate[i][1] = pl->move_path[i][1];
 												}
 											} else {
-												//printf("path not found from %f %f to %f %f\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1]);
+												printf("path not found from %f %f to %f %f over: %f %f, move_reason %d\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1], partial_target[0], partial_target[1], pl->move_reason);
 												pl->move_path[0][0] = en->position[0];
 												pl->move_path[0][1] = en->position[1];
 												pl->move_path[1][0] = en->position[0];
@@ -705,7 +721,7 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 												break;
 											}
 										} else {
-											//printf("path not found from %f %f to %f %f\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1]);
+											printf("path not found from %f %f to %f %f over: %f %f ...\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1], partial_target[0], partial_target[1]);
 											pl->move_path[0][0] = en->position[0];
 											pl->move_path[0][1] = en->position[1];
 											pl->move_path[1][0] = en->position[0];
@@ -721,9 +737,40 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 								}
 								for (int i = 0; i < 10; i++) {
 									float sin_tilde = 0.0f;
+									float sin_o_tilde = 0.0f;
+									vector2<float> sin_o_dir = { partial_target_dir[0]/partial_target_dir_norm, partial_target_dir[1] / partial_target_dir_norm };
+									
+									float shift_param_o_ac = shift_param_o;
+									if (i <= path_unclear_pp + 1) {
+										if (i == 0) {
+											sin_o_tilde = 0;
+										} else {
+											if (path_unclear_pp == 0) { //&& i == 1
+												sin_o_tilde = 1.0f;
+											} else {
+												float inner_way = i / ((float)path_unclear_pp + 1) * 3.1415f/2.0f;
+												sin_o_tilde = sin(inner_way);
+											}
+										}
+										sin_o_dir = { -sin_o_dir[0], -sin_o_dir[1] };
+									} else {
+										shift_param_o_ac = shift_param_o2;
+										if (i == 9) {
+											sin_o_tilde = 0.0f;
+										} else {
+											if (path_unclear_pp == 7) { //&& i == 8
+												sin_o_tilde = 1.0f;
+											} else {
+												float inner_way = (1 - (i - (path_unclear_pp + 2)) / (9.0f - ((float)path_unclear_pp + 2))) * 3.1415f / 2.0f;
+												sin_o_tilde = sin(inner_way);
+											}
+										}
+									}
+
 									if (i <= path_unclear_pp) {
 										if (path_unclear_pp == 0) {
 											sin_tilde = 0;
+											sin_o_tilde = 0.0f;
 										} else {
 											float way_to_pi = i / ((float)path_unclear_pp) * 3.1415f / 2.0f;
 											sin_tilde = sin(way_to_pi);
@@ -731,14 +778,16 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 									} else {
 										if (path_unclear_pp == 8) {
 											sin_tilde = 0;
+											sin_o_tilde = 0;
 										} else {
 											float way_from_pi = (9 - i) / ((float)(9 - path_unclear_pp - 1)) * 3.1415f/2.0f;
 											sin_tilde = sin(way_from_pi);
 										}
 									}
-									pl->move_path[i][0] = en->position[0] + (i / 9.0f) * partial_target_dir[0] + shift_param * sin_tilde * partial_target_dir_orth[0] * shift_indicator;
-									pl->move_path[i][1] = en->position[1] + (i / 9.0f) * partial_target_dir[1] + shift_param * sin_tilde * partial_target_dir_orth[1] * shift_indicator;
-									//printf("%i pu_pp %i, sin_tilde: %f, x,y: %f, %f\n", i, path_unclear_pp, sin_tilde, pl->move_path[i][0], pl->move_path[i][1]);
+
+									pl->move_path[i][0] = en->position[0] + (i / 9.0f) * partial_target_dir[0] + shift_param * sin_tilde * partial_target_dir_orth[0] * shift_indicator + shift_param_o_ac * sin_o_tilde * sin_o_dir[0];
+									pl->move_path[i][1] = en->position[1] + (i / 9.0f) * partial_target_dir[1] + shift_param * sin_tilde * partial_target_dir_orth[1] * shift_indicator + shift_param_o_ac * sin_o_tilde * sin_o_dir[1];
+									//printf("%i pu_pp %i, sin_tilde: %f, shift_param: %f, sin_o_tilde %f, shift_param_o %f, x,y: %f, %f, \n", i, path_unclear_pp, sin_tilde, shift_param, sin_o_tilde, shift_param_o, pl->move_path[i][0], pl->move_path[i][1]);
 									if (pl->move_path[i][0] < 0 || pl->move_path[i][0] >= gm.map_dimensions[0] || pl->move_path[i][1] < 0 || pl->move_path[i][1] >= gm.map_dimensions[1]) {
 										path_valid = false;
 										break;
