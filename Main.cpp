@@ -67,14 +67,37 @@ int top_damage = 0;
 
 struct vector2<unsigned int> mouse_position;
 
+unsigned long mix(unsigned long a, unsigned long b, unsigned long c)
+{
+	a = a - b;  a = a - c;  a = a ^ (c >> 13);
+	b = b - c;  b = b - a;  b = b ^ (a << 8);
+	c = c - a;  c = c - b;  c = c ^ (b >> 13);
+	a = a - b;  a = a - c;  a = a ^ (c >> 12);
+	b = b - c;  b = b - a;  b = b ^ (a << 16);
+	c = c - a;  c = c - b;  c = c ^ (b >> 5);
+	a = a - b;  a = a - c;  a = a ^ (c >> 3);
+	b = b - c;  b = b - a;  b = b ^ (a << 10);
+	c = c - a;  c = c - b;  c = c ^ (b >> 15);
+	return c;
+}
+
+std::random_device r;
+std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
+std::mt19937 eng(seed);
+std::uniform_int_distribution<> dist{ 0, RAND_MAX };
+
+#define rand() myrand()
+
+int myrand() {
+	return dist(eng);
+}
+
 int main(int argc, char** argv) {
 	resolution = {1920, 1080};
 	unsigned int output_size = resolution[0] * resolution[1] * 4;
 	unsigned int output_size_in_bf = (int)ceilf(output_size / (float) sizeof(unsigned int));
 	unsigned int output_position;
-
-	srand(time(nullptr));
-	rand(); rand(); rand();
+		
 
 	//bit field uploaded "once"
 	bit_field_init(&bf_assets, 16, 1024);

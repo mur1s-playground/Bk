@@ -19,6 +19,8 @@
 #include "AssetLoader.hpp"
 #include "TwitchIntegration.hpp"
 
+#define rand() myrand()
+
 unsigned int game_pw_thread_count			= 4;
 HANDLE* game_pw_threads_locks;
 

@@ -11,6 +11,8 @@
 
 #include <math.h>
 
+#define rand() myrand()
+
 using namespace std;
 
 unsigned int			storm_phase_current = 0;
@@ -123,8 +125,8 @@ void storm_next(struct bit_field* bf_map, struct bit_field* bf_rw) {
 
 			bool pathable_target = false;
 			while (!pathable_target) {
-				float rand_dist = std::rand() / (float)RAND_MAX * max_dist_from_last_center;
-				float rand_angle = std::rand() / (float)RAND_MAX * 2 * std::_Pi;
+				float rand_dist = rand() / (float)RAND_MAX * max_dist_from_last_center;
+				float rand_angle = rand() / (float)RAND_MAX * 2 * std::_Pi;
 				storm_to.x = (unsigned int)(storm_last.x + rand_dist * std::cosf(rand_angle));
 				storm_to.y = (unsigned int)(storm_last.y + rand_dist * std::sinf(rand_angle));
 				if (bf_map->data[gm.map_pathable_position + (storm_to.y) * gm.map_dimensions[0] + (storm_to.x)] > 0) {

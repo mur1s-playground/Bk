@@ -36,4 +36,6 @@ extern int top_damage;
 
 extern struct vector2<unsigned int> mouse_position;
 
+int myrand();
+
 #endif
