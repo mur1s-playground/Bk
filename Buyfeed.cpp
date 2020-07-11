@@ -29,12 +29,12 @@ void buyfeed_add(struct bit_field* bf_rw, char buyer[50], int item_id) {
 		for (int i = 0; i < 63; i++) {
 			if (bf[bfm_it->second].value[i] == '\0') {
 				if (item_id == 51) {
-					bf[bfm_it->second].value[i] = ']';
+					bf[bfm_it->second].value[i] = 2;
 				}
 				else if (item_id == 52) {
-					bf[bfm_it->second].value[i] = '`';
+					bf[bfm_it->second].value[i] = 3;
 				}
-				bf[bfm_it->second].value[i + 1] = '^';
+				bf[bfm_it->second].value[i + 1] = 32;
 				break;
 			}
 		}
