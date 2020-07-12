@@ -208,6 +208,9 @@ __global__ void draw_entities_kernel(
                                 //enum player_stance p_stance = players[p].player_stance;
                                 //enum player_action p_action = players[p].player_action;
 
+                                float interpixel_min = 255.0f;
+                                float interpixel_alpha_max = 0.0f;
+
                                 for (int s_y = 0; s_y < sampling_filter_dim; s_y++) {
                                     for (int s_x = 0; s_x < sampling_filter_dim; s_x++) {
                                         if (offset_to_model_shadow_base_x + s_x >= 1 && offset_to_model_shadow_base_x + s_x < m->shadow_dimensions[0] * upscale_fac - 1 &&
@@ -219,11 +222,20 @@ __global__ void draw_entities_kernel(
 
                                             float interpixel_alpha = getInterpixel(p_shadow, m->shadow_dimensions[0] * upscale_fac, m->shadow_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, 3);
                                             if (interpixel_alpha > 25) {
+                                                if (interpixel_alpha_max < interpixel_alpha) {
+                                                    interpixel_alpha_max = interpixel_alpha;
+                                                }
                                                 float interpixel = getInterpixel(p_shadow, m->shadow_dimensions[0] * upscale_fac, m->shadow_dimensions[1] * upscale_fac, 4, model_palette_idx_x, model_palette_idx_y, current_channel);
-                                                output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - interpixel_alpha) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (interpixel_alpha / 255.0f) * interpixel));
+                                                if (interpixel < interpixel_min) {
+                                                    interpixel_min = interpixel;
+                                                }
+                                                //output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - interpixel_alpha) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (interpixel_alpha / 255.0f) * interpixel));
                                             }
                                         }
                                     }
+                                }
+                                if (interpixel_alpha_max > 25) {
+                                    output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - interpixel_alpha_max) / 255.0f * output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] + (interpixel_alpha_max / 255.0f) * interpixel_min));
                                 }
                             }
                         }

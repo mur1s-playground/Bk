@@ -123,11 +123,12 @@ __global__ void draw_map_kernel(const unsigned int* device_data, const struct ve
             current_tile_x_max /= 2.0f;
             current_tile_y_max /= 2.0f;
             zero_fac *= 2.0f;
-        }
-        else if (map_zoom_level > map_zoom_level_center) {
-            current_tile_x_max *= 2.0f;
-            current_tile_y_max *= 2.0f;
-            zero_fac /= 2.0f;
+        } else if (map_zoom_level > map_zoom_level_center) {
+            for (int mzl = map_zoom_level_center; mzl < map_zoom_level; mzl++) {
+                current_tile_x_max *= 2.0f;
+                current_tile_y_max *= 2.0f;
+                zero_fac /= 2.0f;
+            }
         }
         int last_width = (int)current_tile_x_max % 1920;
         int last_height = (int)current_tile_y_max % 1080;
