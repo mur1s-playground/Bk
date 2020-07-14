@@ -117,6 +117,7 @@
     <ClInclude Include="Map.hpp" />
     <ClInclude Include="MapEditor.hpp" />
     <ClInclude Include="Model.hpp" />
+    <ClInclude Include="Particle.hpp" />
     <ClInclude Include="Player.hpp" />
     <ClInclude Include="Playerlist.hpp" />
     <ClInclude Include="SDLShow.hpp" />
@@ -130,6 +131,7 @@
   <ItemGroup>
     <CudaCompile Include="Entity.cu" />
     <CudaCompile Include="Map.cu" />
+	<CudaCompile Include="Particle.cu" />
     <CudaCompile Include="Storm.cu" />
     <CudaCompile Include="UI.cu" />
   </ItemGroup>

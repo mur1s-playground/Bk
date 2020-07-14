@@ -18,6 +18,7 @@
 #include "UI.hpp"
 #include "AssetLoader.hpp"
 #include "TwitchIntegration.hpp"
+#include "Particle.hpp"
 
 #define rand() myrand()
 
@@ -304,15 +305,26 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 				int has_gun = -1;
 				for (int inv = 0; inv < 6; inv++) {
 					if (pl->inventory[inv].item_id == UINT_MAX) {
+						for (int i_v = inv + 1; i_v < 6; i_v++) {
+							if (pl->inventory[i_v].item_id < UINT_MAX) {
+								pl->inventory[inv].item_id = pl->inventory[i_v].item_id;
+								pl->inventory[inv].item_param = pl->inventory[i_v].item_param;
+								pl->inventory[i_v].item_id = UINT_MAX;
+								break;
+							}
+						}
 						has_inv_space++;
 					}
-					else if (pl->inventory[inv].item_id == 50) {
+					if (pl->inventory[inv].item_id == UINT_MAX) {
+						has_inv_space += (6 - inv - 1);
+						break;
+					}
+					if (pl->inventory[inv].item_id == 50) {
 						has_gun = inv;
 						if (pl->inventory[inv].item_param % 15 != 0) {
 							pl->inventory[inv].item_param++;
 						}
-					}
-					else if (pl->inventory[inv].item_id == 51) {
+					} else if (pl->inventory[inv].item_id == 51) {
 						if (pl->shield <= 75 && pl->inventory[inv].item_param != 0) {
 							//printf("shiedling\n");
 							pl->shield += 25;
@@ -322,17 +334,16 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 							pl->inventory[inv].item_id = UINT_MAX;
 							has_inv_space++;
 						}
-					}
-					else if (pl->inventory[inv].item_id == 52) {
-					if (pl->health <= 75 && pl->inventory[inv].item_param != 0) {
-						//printf("healing\n");
-						pl->health += 25;
-						pl->inventory[inv].item_param--;
-					}
-					if (pl->inventory[inv].item_param == 0) {
-						pl->inventory[inv].item_id = UINT_MAX;
-						has_inv_space++;
-					}
+					} else if (pl->inventory[inv].item_id == 52) {
+						if (pl->health <= 75 && pl->inventory[inv].item_param != 0) {
+							//printf("healing\n");
+							pl->health += 25;
+							pl->inventory[inv].item_param--;
+						}
+						if (pl->inventory[inv].item_param == 0) {
+							pl->inventory[inv].item_id = UINT_MAX;
+							has_inv_space++;
+						}
 					}
 				}
 
@@ -366,6 +377,9 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					}
 				}
 
+				unsigned char* pathables = (unsigned char*)&bf_map.data[gm.map_pathable_position];
+
+				bool attack_target_in_range = false;
 				//current position
 				int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { en->position[0], en->position[1], 0.0f });
 				if (gi > -1) {
@@ -396,18 +410,36 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 										}
 									}
 								}
-								else if (etc->et == ET_PLAYER && has_gun >= 0 && pl->inventory[has_gun].item_param % 15 == 0) {
+								else if (etc->et == ET_PLAYER && has_gun >= 0) {
 									if (players[etc->name].health > 0 && gi == grid_get_index(bf_rw.data, gd.position_in_bf, { etc->position[0], etc->position[1], 0.0f })) {
-										pl->inventory[has_gun].item_param++;
-										float hit = (rand() / (float)RAND_MAX);
-										//printf("player: %s shoots at %s", pl->name, etc->name);
-										if (hit < 0.8) {
-											size_t pl_ptr = (size_t)&players[etc->name];
-											unsigned int pl_ptr_1 = ((unsigned int*)&pl_ptr)[0];
-											unsigned int pl_ptr_2 = ((unsigned int*)&pl_ptr)[1];
-											player_action_param_add(pl, PAT_SHOOT_AT, pl_ptr_1, pl_ptr_2);
+										float t_dist = sqrtf((etc->position[0] - en->position[0]) * (etc->position[0] - en->position[0]) + (etc->position[1] - en->position[1]) * (etc->position[1] - en->position[1])) + 1e-5;
+
+										if (t_dist/32.0f < 5.0f) {
+											vector2<float> t_dir = { (etc->position[0] - en->position[0]),  (etc->position[1] - en->position[1])};
+
+											vector2<float> t_cur = { en->position[0], en->position[1] };
+											bool visible_t = true;
+											for (int vis_p = 1; vis_p < 32; vis_p++) {
+												t_cur[0] = en->position[0] + (vis_p / 32.0f) * t_dir[0];
+												t_cur[1] = en->position[1] + (vis_p / 32.0f) * t_dir[1];
+
+												if (pathables[(int)floorf(t_cur[1]) * gm.map_dimensions[0] + (int)floorf(t_cur[0])] == 0) {
+													visible_t = false;
+													break;
+												}
+											}
+											
+											if (visible_t) {
+												if (pl->attack_target == nullptr) {
+													pl->attack_target = &players[etc->name];
+													attack_target_in_range = true;
+												}
+												else if (pl->attack_target == &players[etc->name]) {
+													attack_target_in_range = true;
+												}
+											}
+											//printf("\n");
 										}
-										//printf("\n");
 									}
 								}
 							}
@@ -486,6 +518,8 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 				int					  spiral_steps = 1;
 				int					  spiral_steps_counter = 1;
 
+				int viewing_orientation = -1;
+
 				while (spiral_steps < 10) {
 					//process grid
 					int gi = grid_get_index(bf_rw.data, gd.position_in_bf, { spiral_pos[0], spiral_pos[1], 0.0f });
@@ -522,19 +556,36 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 												}
 											}
 										}
-									} else if (etc->et == ET_PLAYER && has_gun >= 0 && pl->inventory[has_gun].item_param % 15 == 0 && dist/32.0f < 5.0f) {
-											if (players[etc->name].health > 0 && gi == grid_get_index(bf_rw.data, gd.position_in_bf, { etc->position[0], etc->position[1], 0.0f })) {
-												pl->inventory[has_gun].item_param++;
-												float hit = (rand() / (float)RAND_MAX);
-												//printf("player: %s shoots at %s", pl->name, etc->name);
-												if (hit < 0.8) {
-													size_t pl_ptr = (size_t)&players[etc->name];
-													unsigned int pl_ptr_1 = ((unsigned int*)&pl_ptr)[0];
-													unsigned int pl_ptr_2 = ((unsigned int*)&pl_ptr)[1];
-													player_action_param_add(pl, PAT_SHOOT_AT, pl_ptr_1, pl_ptr_2);
+									} else if (etc->et == ET_PLAYER && has_gun >= 0) {
+										if (players[etc->name].health > 0 && gi == grid_get_index(bf_rw.data, gd.position_in_bf, { etc->position[0], etc->position[1], 0.0f })) {
+											float t_dist = sqrtf((etc->position[0] - en->position[0]) * (etc->position[0] - en->position[0]) + (etc->position[1] - en->position[1]) * (etc->position[1] - en->position[1])) + 1e-5;
+
+											if (t_dist/32.0f < 5.0f) {
+												vector2<float> t_dir = { (etc->position[0] - en->position[0]),  (etc->position[1] - en->position[1])};
+
+												vector2<float> t_cur = { en->position[0], en->position[1] };
+												bool visible_t = true;
+												for (int vis_p = 1; vis_p < 32; vis_p++) {
+													t_cur[0] = en->position[0] + (vis_p / 32.0f) * t_dir[0];
+													t_cur[1] = en->position[1] + (vis_p / 32.0f) * t_dir[1];
+
+													if (pathables[(int)floorf(t_cur[1]) * gm.map_dimensions[0] + (int)floorf(t_cur[0])] == 0) {
+														visible_t = false;
+														break;
+													}
+												}
+												
+												if (visible_t) {
+													if (pl->attack_target == nullptr) {
+														pl->attack_target = &players[etc->name];
+														attack_target_in_range = true;
+													} else if (pl->attack_target == &players[etc->name]) {
+														attack_target_in_range = true;
+													}
 												}
 												//printf("\n");
 											}
+										}
 									}
 								}
 							}
@@ -556,7 +607,29 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					}
 				}
 					
-				unsigned char* pathables = (unsigned char*)&bf_map.data[gm.map_pathable_position];
+				if (!attack_target_in_range) {
+					pl->attack_target = nullptr;
+				} else {
+					struct entity* etc = &es[pl->attack_target->entity_id];
+					viewing_orientation = en->orientation;
+					viewing_orientation = (int)roundf(atan2(-(etc->position[1] - en->position[1]), (etc->position[0] - en->position[0])) * (180 / 3.1415f)) + 90;
+
+					if (viewing_orientation < 0) {
+						viewing_orientation += 360;
+					}
+					if (abs(((int)en->orientation - viewing_orientation) % 360) < orientation_change_per_tick && pl->inventory[has_gun].item_param % 15 == 0) {
+						pl->inventory[has_gun].item_param++;
+						float hit = (rand() / (float)RAND_MAX);
+						//printf("player: %s shoots at %s", pl->name, etc->name);
+						if (hit < 0.8) {
+							size_t pl_ptr = (size_t)pl->attack_target;
+							unsigned int pl_ptr_1 = ((unsigned int*)&pl_ptr)[0];
+							unsigned int pl_ptr_2 = ((unsigned int*)&pl_ptr)[1];
+							player_action_param_add(pl, PAT_SHOOT_AT, pl_ptr_1, pl_ptr_2);
+						}
+					}
+				}
+
 				unsigned char pathable = 0;
 
 				if (player_move_target_override_set.load()) {
@@ -807,9 +880,15 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 				delta_x = player_dist_per_tick * (active_target[0] - en->position[0]) / dist_from_target;
 				delta_y = player_dist_per_tick * (active_target[1] - en->position[1]) / dist_from_target;
 
+				int movement_orientation = (int)roundf(atan2(-delta_y, delta_x) * (180 / 3.1415f)) + 90;
+
 				int target_orientation = en->orientation;
-				target_orientation = (int)roundf(atan2(-delta_y, delta_x) * (180 / 3.1415f)) + 90;
-				
+				if (viewing_orientation > -1) {
+					target_orientation = viewing_orientation;
+				} else {
+					target_orientation = movement_orientation;
+				}
+
 				if (target_orientation < 0) {
 					target_orientation += 360;
 				}
@@ -830,10 +909,16 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					if (en->orientation < 0) en->orientation += 360;
 				} else {
 					en->orientation = target_orientation;
-					unsigned int delta_x_i = *((unsigned int*)&delta_x);
-					unsigned int delta_y_i = *((unsigned int*)&delta_y);
-					player_action_param_add(&players_it->second, PAT_MOVE, delta_x_i, delta_y_i);
 				}
+
+				float orientation_speed_factor = 0.75 + 0.25 * cos(abs(target_orientation-movement_orientation)/90.0f * 3.1415f) + (0.1*cos(abs(target_orientation - movement_orientation) / 180.0f * 3.1415f) - 0.1);
+				delta_x *= orientation_speed_factor;
+				delta_y *= orientation_speed_factor;
+
+				unsigned int delta_x_i = *((unsigned int*)&delta_x);
+				unsigned int delta_y_i = *((unsigned int*)&delta_y);
+				player_action_param_add(&players_it->second, PAT_MOVE, delta_x_i, delta_y_i);
+				
 				en->params[0] = (char)players_it->second.health;
 				en->params[1] = (char)players_it->second.shield;
 				int* params = (int*)&en->params;
@@ -862,7 +947,7 @@ void game_tick() {
 	}
 
 	WaitForMultipleObjects(4, game_wthreads, TRUE, INFINITE);
-	
+
 		map<string, struct player>::iterator players_it = players.begin();
 		//players_it = players.begin();
 		struct entity* es = (struct entity*) & bf_rw.data[entities_position];
@@ -907,7 +992,10 @@ void game_tick() {
 					pl_ptr_[0] = pl_ptr_1;
 					pl_ptr_[1] = pl_ptr_2;
 					struct player* pl_target = (struct player*) pl_ptr;
+
 					if (pl_target->health > 0) {
+						struct entity* target_entity = &es[pl_target->entity_id];
+
 						if (pl_target->shield > 0) {
 							pl_target->shield -= 10;
 						}
@@ -918,7 +1006,6 @@ void game_tick() {
 						//printf(" hit");
 						if (pl_target->health <= 0) {
 							pl_target->alive = false;
-							struct entity* target_entity = &es[pl_target->entity_id];
 							//object itself
 							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, target_entity->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl_target->entity_id);
 							//object text
@@ -931,6 +1018,13 @@ void game_tick() {
 							//printf(" & kill");
 							killfeed_add(&bf_rw, pl->name, pl_target->name);
 							leaderboard_add(&bf_rw, pl_target->name, pl_target->damage_dealt, pl_target->kills, pl->name);
+						} else {
+							if (pl->entity_id < UINT_MAX) {
+								struct entity* en = (struct entity*)&es[pl->entity_id];
+								float delta_x_off = 6*cos((en->orientation + 210) / 180.0f * 3.1415f);
+								float delta_y_off = -5*sin((en->orientation + 210) / 180.0f * 3.1415f);
+								particle_add(&bf_rw, 120, vector2<float>(en->position[0] + 12 + delta_x_off, en->position[1] + 12 + delta_y_off), vector2<float>(target_entity->position[0] + 12, target_entity->position[1] + 12), 8.0f);
+							}
 						}
 					}
 				} else if (pap_start[0] == PAT_PICKUP_ITEM) {
@@ -962,6 +1056,7 @@ void game_tick() {
 														pl->inventory[inv].item_param = 5;
 														grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, etc->position, { item_models[0].model_scale, item_models[0].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&item_models[0]), item_entity_id);
 														pl->move_reason = PAT_NONE;
+														en->model_id = 1;
 														break;
 													}
 												}
@@ -1097,6 +1192,8 @@ void game_tick() {
 					players_it++;
 				}
 			}
+
+		particles_tick(&bf_rw);
 }
 
 void game_destroy() {
@@ -1139,6 +1236,9 @@ void game_destroy() {
 	//remove entities
 	entities.clear();
 	bit_field_remove_bulk_from_segment(&bf_rw, entities_position - 1);
+
+	//reset particles
+	particles_clear(&bf_rw);
 
 	//killfeed reset
 	killfeed_reset(&bf_rw);

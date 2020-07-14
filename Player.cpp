@@ -32,6 +32,9 @@ void player_models_init(struct bit_field* bf_assets) {
         if (model_cfgs[i].substr(0, model_cfgs[i].find_last_of('.')) == "hope") {
             player_models.try_emplace(PT_HOPE, m);
             pms.push_back(m);
+        } else if (model_cfgs[i].substr(0, model_cfgs[i].find_last_of('.')) == "hope_with_gun") {
+            player_models.try_emplace(PT_HOPE, m);
+            pms.push_back(m);
         }
     }
     int counter = 0;
@@ -62,6 +65,7 @@ void player_add(struct bit_field *bf_rw, string name, enum player_type pt, unsig
         p.pt = pt;
         p.damage_dealt = 0;
         p.kills = 0;
+        p.attack_target = nullptr;
         for (int i = 0; i < name.length() && i < 50; i++) {
             p.name[i] = name[i];
             p.name_len = i+1;

@@ -40,6 +40,8 @@ struct player {
 	unsigned int			inventory_active_slot;
 	struct item				inventory[6];
 
+	struct player *			attack_target;
+
 	enum player_action_type move_reason;
 	vector2<float>			move_target;
 

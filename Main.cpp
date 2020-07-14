@@ -19,6 +19,7 @@
 #include "Util.hpp"
 #include "Game.hpp"
 #include "MapEditor.hpp"
+#include "Particle.hpp"
 
 
 #include "time.h"
@@ -130,6 +131,9 @@ int main(int argc, char** argv) {
 
 	//load list of available maps
 	map_list_init(&bf_rw);
+
+	// -- PARTICLES --//
+	particles_init(&bf_rw);
 	
 	// -- MODELS -- //
 
@@ -280,6 +284,9 @@ int main(int argc, char** argv) {
 			camera_move_z_tick();
 			camera_get_crop(camera_crop);
 			launch_draw_map(bf_map.device_data[0], gm.map_zoom_level_count, gm.map_zoom_center_z, gm.map_zoom_level_offsets_position, gm.map_positions, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
+			launch_draw_particles_kernel(bf_assets.device_data[0],
+				bf_rw.device_data[0], particles_position,
+				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], game_ticks);
 			launch_draw_entities_kernel(bf_assets.device_data[0], bf_map.device_data[0], player_models_position, item_models_position, map_models_position, ui_fonts_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
 				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], mouse_position, game_ticks);
 			if (!map_editor) {

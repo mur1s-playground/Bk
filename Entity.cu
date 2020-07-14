@@ -276,108 +276,6 @@ __global__ void draw_entities_kernel(
                             float offset_to_model_base_x = (current_game_x - (entities[entity_id].position[0])) / ((m->model_scale * entities[entity_id].scale) / upscale_fac);
                             float offset_to_model_base_y = (current_game_y - (entities[entity_id].position[1])) / ((m->model_scale * entities[entity_id].scale) / upscale_fac);
 
-                            if (entities[entity_id].et == ET_PLAYER) {
-                                //inventory
-                                int inventory_max_id = -1;
-                                int* params = (int*)&entities[entity_id].params;
-                                int params_pos = 1;
-                                for (int ip = 0; ip < 6; ip++) {
-                                    if (params[params_pos++] < UINT_MAX) inventory_max_id = ip;
-                                    params_pos++;
-                                }
-
-                                if (offset_to_model_base_y < 32 * (inventory_max_id+1) && offset_to_model_base_y >= 0.0f && offset_to_model_base_x + 32.0f >= -3 - 18 && offset_to_model_base_x + 32.0f < 20) {
-                                    output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = 200;
-
-                                    if (offset_to_model_base_x + 32.0f + 19 >= 0 && offset_to_model_base_x + 32.0f + 19 < 32) {
-                                        //inventory "text"
-                                        int letter_idx = (int)(offset_to_model_base_y) / 32;
-                                        int letter_code = 0;
-                                        if (params[1 + letter_idx * 2] < UINT_MAX) {
-                                            if (params[1 + letter_idx * 2] == 50) {
-                                                letter_code = 1;
-                                            }
-                                            else if (params[1 + letter_idx * 2] == 51) {
-                                                letter_code = 2;
-                                            }
-                                            else if (params[1 + letter_idx * 2] == 52) {
-                                                letter_code = 3;
-                                            }
-                                            if (letter_code >= 0 && letter_code <= 127 && device_data_assets[font_position + letter_code] > 0) {
-                                                unsigned char* letter = (unsigned char*)&device_data_assets[device_data_assets[font_position + letter_code]];
-                                                int letter_x = (int)(offset_to_model_base_x + 32.0f + 19) % 32;
-                                                int letter_y = (int)offset_to_model_base_y % 32;
-
-                                                //shooting
-                                                if (params[1 + letter_idx * 2] == 50 && params[1 + letter_idx * 2 + 1] % 15 != 0) {
-                                                    if (letter_x >= 28 && letter_x <= 32 && letter_y >= 7 && letter_y <= 15) {
-                                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
-                                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 0;
-                                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
-                                                    }
-                                                }
-
-                                                float letter_alpha = letter[letter_y * (32 * 4) + letter_x * 4 + 3];
-                                                if (letter_alpha > 25) {
-                                                    output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - letter_alpha) / 255.0f * 255 + (letter_alpha / 255.0f) * letter[letter_y * (32 * 4) + letter_x * 4 + current_channel]));
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                //top text bg
-                                if (offset_to_model_base_y < 3 && offset_to_model_base_y >= -35.0f && offset_to_model_base_x + 32.0f >= -3 -18 && offset_to_model_base_x + 32.0f < entities[entity_id].name_len * 32 + 3) {
-                                    int bg_alpha = 150;
-                                    output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = 200;
-                                }
-                                //hp bar
-                                if (offset_to_model_base_y < 2 && offset_to_model_base_y >= -33.0f && offset_to_model_base_x + 32.0f >= -19 && offset_to_model_base_x + 32.0f < -11) {
-                                    float hp_percent = entities[entity_id].params[0] / (float)100.0f;
-                                    float hp_scale_y = 31.0f;
-                                    if ( hp_percent* hp_scale_y -33.0f >= offset_to_model_base_y) {
-                                        if (hp_percent > 0.66f) {
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255;
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
-                                        } else if (hp_percent > 0.33f) {
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 157;
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
-                                        } else {
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 0;
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
-                                        }
-                                    }
-                                }
-                                //shield bar
-                                if (offset_to_model_base_y < 2 && offset_to_model_base_y >= -33.0f && offset_to_model_base_x + 32.0f >= -11 && offset_to_model_base_x + 32.0f < -3) {
-                                    float shield_percent = entities[entity_id].params[1] / (float)100.0f;
-                                    float shield_scale_y = 31.0f;
-                                    if (shield_percent * shield_scale_y - 33.0f >= offset_to_model_base_y) {
-                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 25;
-                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255;
-                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255;
-                                    }
-                                }
-                                //top text
-                                if (offset_to_model_base_y < 0 && offset_to_model_base_y >= -32.0f && offset_to_model_base_x + 32.0f >= 0 && offset_to_model_base_x + 32.0f < entities[entity_id].name_len *32) {
-                                    int letter_idx = (int)(offset_to_model_base_x + 32.0f) / 32;
-                                    int letter_code = (int)entities[entity_id].name[letter_idx];
-                                    if (letter_code >= 0 && letter_code <= 127 && device_data_assets[font_position + (int)entities[entity_id].name[letter_idx]] > 0) {
-                                        unsigned char* letter = (unsigned char*)&device_data_assets[device_data_assets[font_position + (int)entities[entity_id].name[letter_idx]]];
-                                        int letter_y = (int)offset_to_model_base_y + 32;
-                                        int letter_x = ((int)offset_to_model_base_x + 32) % 32;
-                                        float letter_alpha = letter[letter_y * (32 * 4) + letter_x * 4 + 3];
-                                        if (letter_alpha > 25) {
-                                            //printf("%i ", (int)entities[entity_id].name[letter_idx]);                                        
-                                            output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - letter_alpha) / 255.0f * 255 + (letter_alpha / 255.0f) * letter[letter_y * (32 * 4) + letter_x * 4 + current_channel]));
-                                        }
-                                    }
-                                }
-                            }
-
                             if (offset_to_model_base_x >= 1 && offset_to_model_base_x < m->model_dimensions[0] * upscale_fac - 1 &&
                                 offset_to_model_base_y >= 1 && offset_to_model_base_y < m->model_dimensions[1] * upscale_fac - 1) {
 
@@ -520,6 +418,124 @@ __global__ void draw_entities_kernel(
                             }
                         }
                         //}
+                    }
+                }
+
+                for (int e = 0; e < entities_count; e++) {
+                    unsigned int entity_id = device_data_rw[entities_iddata_position + 1 + e];
+                    if (entity_id < UINT_MAX) {
+                        struct model* m = nullptr;
+                        const unsigned int* model_positions;
+                        if (entities[entity_id].et == ET_PLAYER) {
+                            m = &player_models[entities[entity_id].model_id];
+                            model_positions = &device_data_assets[m->model_positions];
+
+                            //inventory
+                            int inventory_max_id = -1;
+                            int* params = (int*)&entities[entity_id].params;
+                            int params_pos = 1;
+                            for (int ip = 0; ip < 6; ip++) {
+                                if (params[params_pos++] < UINT_MAX) inventory_max_id = ip;
+                                params_pos++;
+                            }
+
+                            float offset_to_model_base_x = (current_game_x - (entities[entity_id].position[0])) / ((m->model_scale * entities[entity_id].scale));
+                            float offset_to_model_base_y = (current_game_y - (entities[entity_id].position[1])) / ((m->model_scale * entities[entity_id].scale));
+
+                            if (offset_to_model_base_y < 32 * (inventory_max_id + 1) && offset_to_model_base_y >= 0.0f && offset_to_model_base_x + 32.0f >= -3 - 18 && offset_to_model_base_x + 32.0f < 20) {
+                                output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = 200;
+
+                                if (offset_to_model_base_x + 32.0f + 19 >= 0 && offset_to_model_base_x + 32.0f + 19 < 32) {
+                                    //inventory "text"
+                                    int letter_idx = (int)(offset_to_model_base_y) / 32;
+                                    int letter_code = 0;
+                                    if (params[1 + letter_idx * 2] < UINT_MAX) {
+                                        if (params[1 + letter_idx * 2] == 50) {
+                                            letter_code = 1;
+                                        }
+                                        else if (params[1 + letter_idx * 2] == 51) {
+                                            letter_code = 2;
+                                        }
+                                        else if (params[1 + letter_idx * 2] == 52) {
+                                            letter_code = 3;
+                                        }
+                                        if (letter_code >= 0 && letter_code <= 127 && device_data_assets[font_position + letter_code] > 0) {
+                                            unsigned char* letter = (unsigned char*)&device_data_assets[device_data_assets[font_position + letter_code]];
+                                            int letter_x = (int)(offset_to_model_base_x + 32.0f + 19) % 32;
+                                            int letter_y = (int)offset_to_model_base_y % 32;
+
+                                            //shooting
+                                            /*
+                                            if (params[1 + letter_idx * 2] == 50 && params[1 + letter_idx * 2 + 1] % 15 != 0) {
+                                                if (letter_x >= 28 && letter_x <= 32 && letter_y >= 7 && letter_y <= 15) {
+                                                    output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
+                                                    output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 0;
+                                                    output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
+                                                }
+                                            }
+                                            */
+                                            float letter_alpha = letter[letter_y * (32 * 4) + letter_x * 4 + 3];
+                                            if (letter_alpha > 25) {
+                                                output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - letter_alpha) / 255.0f * 255 + (letter_alpha / 255.0f) * letter[letter_y * (32 * 4) + letter_x * 4 + current_channel]));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            //top text bg
+                            if (offset_to_model_base_y < 3 && offset_to_model_base_y >= -35.0f && offset_to_model_base_x + 32.0f >= -3 - 18 && offset_to_model_base_x + 32.0f < entities[entity_id].name_len * 32 + 3) {
+                                int bg_alpha = 150;
+                                output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = 200;
+                            }
+                            //hp bar
+                            if (offset_to_model_base_y < 2 && offset_to_model_base_y >= -33.0f && offset_to_model_base_x + 32.0f >= -19 && offset_to_model_base_x + 32.0f < -11) {
+                                float hp_percent = entities[entity_id].params[0] / (float)100.0f;
+                                float hp_scale_y = 31.0f;
+                                if (hp_percent * hp_scale_y - 33.0f >= offset_to_model_base_y) {
+                                    if (hp_percent > 0.66f) {
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255;
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
+                                    }
+                                    else if (hp_percent > 0.33f) {
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 157;
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
+                                    }
+                                    else {
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 0;
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
+                                    }
+                                }
+                            }
+                            //shield bar
+                            if (offset_to_model_base_y < 2 && offset_to_model_base_y >= -33.0f && offset_to_model_base_x + 32.0f >= -11 && offset_to_model_base_x + 32.0f < -3) {
+                                float shield_percent = entities[entity_id].params[1] / (float)100.0f;
+                                float shield_scale_y = 31.0f;
+                                if (shield_percent * shield_scale_y - 33.0f >= offset_to_model_base_y) {
+                                    output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 25;
+                                    output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255;
+                                    output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255;
+                                }
+                            }
+                            //top text
+                            if (offset_to_model_base_y < 0 && offset_to_model_base_y >= -32.0f && offset_to_model_base_x + 32.0f >= 0 && offset_to_model_base_x + 32.0f < entities[entity_id].name_len * 32) {
+                                int letter_idx = (int)(offset_to_model_base_x + 32.0f) / 32;
+                                int letter_code = (int)entities[entity_id].name[letter_idx];
+                                if (letter_code >= 0 && letter_code <= 127 && device_data_assets[font_position + (int)entities[entity_id].name[letter_idx]] > 0) {
+                                    unsigned char* letter = (unsigned char*)&device_data_assets[device_data_assets[font_position + (int)entities[entity_id].name[letter_idx]]];
+                                    int letter_y = (int)offset_to_model_base_y + 32;
+                                    int letter_x = ((int)offset_to_model_base_x + 32) % 32;
+                                    float letter_alpha = letter[letter_y * (32 * 4) + letter_x * 4 + 3];
+                                    if (letter_alpha > 25) {
+                                        //printf("%i ", (int)entities[entity_id].name[letter_idx]);                                        
+                                        output[current_y * (output_width * output_channels) + current_x * output_channels + current_channel] = (unsigned char)(((255 - letter_alpha) / 255.0f * 255 + (letter_alpha / 255.0f) * letter[letter_y * (32 * 4) + letter_x * 4 + current_channel]));
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
