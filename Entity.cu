@@ -568,12 +568,21 @@ void launch_draw_entities_kernel(
     int threadsPerBlock = 256;
     int blocksPerGrid = (output_width * output_height * 3 + threadsPerBlock - 1) / threadsPerBlock;
 
+#ifdef PATHING_DEBUG
+    draw_entities_kernel << <blocksPerGrid, threadsPerBlock >> > (device_data_assets, device_data_map, players_models_position, item_models_position, map_models_position, font_position,
+        device_data_rw, entities_position, player_selected_id, gd_position_in_bf, gd_data_position_in_bf,
+        gm.map_dimensions,
+        gm.map_pathable_position, 1, struct vector2<unsigned int>(0, 0),
+        device_data_output, output_position, output_width, output_height, output_channels,
+        camera_x1, camera_y1, camera_z, mouse_position, tick_counter);
+#else
     draw_entities_kernel << <blocksPerGrid, threadsPerBlock >> > (device_data_assets, device_data_map, players_models_position, item_models_position, map_models_position, font_position,
                                 device_data_rw, entities_position, player_selected_id, gd_position_in_bf, gd_data_position_in_bf,
                                 gm.map_dimensions,
                                 gm.map_pathable_position, mapeditor_action_type, mapeditor_pathing_brushsize,
                                 device_data_output, output_position, output_width, output_height, output_channels, 
                                 camera_x1, camera_y1, camera_z, mouse_position, tick_counter);
+#endif
     err = cudaGetLastError();
 
     if (err != cudaSuccess) {

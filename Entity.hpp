@@ -5,6 +5,7 @@
 #include "Vector3.hpp"
 #include <vector>
 #include <string>
+#include "FeatureToggles.hpp"
 
 enum entity_type {
 	ET_PLAYER,
@@ -27,7 +28,11 @@ struct entity {
 	unsigned int			model_z;
 	unsigned int			model_animation_offset;
 
+#ifdef PATHING_DEBUG
+	char					params[256];
+#else
 	char					params[50];
+#endif
 };
 
 using namespace std;

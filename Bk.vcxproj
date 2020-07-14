@@ -107,6 +107,7 @@
     <ClInclude Include="Buyfeed.hpp" />
     <ClInclude Include="Camera.hpp" />
     <ClInclude Include="Entity.hpp" />
+    <ClInclude Include="FeatureToggles.hpp" />
     <ClInclude Include="Game.hpp" />
     <ClInclude Include="Grid.hpp" />
     <ClInclude Include="Item.hpp" />
@@ -118,6 +119,7 @@
     <ClInclude Include="MapEditor.hpp" />
     <ClInclude Include="Model.hpp" />
     <ClInclude Include="Particle.hpp" />
+    <ClInclude Include="Pathing.hpp" />
     <ClInclude Include="Player.hpp" />
     <ClInclude Include="Playerlist.hpp" />
     <ClInclude Include="SDLShow.hpp" />
@@ -131,7 +133,8 @@
   <ItemGroup>
     <CudaCompile Include="Entity.cu" />
     <CudaCompile Include="Map.cu" />
-	<CudaCompile Include="Particle.cu" />
+    <CudaCompile Include="Particle.cu" />
+    <CudaCompile Include="Pathing.cu" />
     <CudaCompile Include="Storm.cu" />
     <CudaCompile Include="UI.cu" />
   </ItemGroup>

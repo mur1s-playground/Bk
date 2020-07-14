@@ -658,9 +658,11 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 				
 				if (pl->move_path_active_id == pl->move_path_len) {
 					//(partial) path to target
+
 					pl->move_path_len = 10;
 					//printf("searching path from %f %f to %f %f, %i\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1], pl->move_reason);
-					float dist = sqrtf((en->position[0] - pl->move_target[0]) * (en->position[0] - pl->move_target[0]) + (en->position[1] - pl->move_target[1]) * (en->position[1] - pl->move_target[1]));
+					float dist = sqrtf((en->position[0] - pl->move_target[0]) * (en->position[0] - pl->move_target[0]) + (en->position[1] - pl->move_target[1]) * (en->position[1] - pl->move_target[1])) + 1e-5;
+					
 					float cl_dist = min(dist, 256.0f);
 					vector2<float> partial_target = { en->position[0] + cl_dist / dist * (pl->move_target[0] - en->position[0]), en->position[1] + cl_dist / dist * (pl->move_target[1] - en->position[1])};
 					while (pathables[(int)floorf(partial_target[1]) * gm.map_dimensions[0] + (int)floorf(partial_target[0])] == 0 && cl_dist > 10.0f) {
@@ -869,10 +871,11 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 									}
 								}
 							}
+						} else {
+							pl->move_target = partial_target;
 						}
 					}
 				}
-				
 				vector2<float> active_target = { pl->move_path[pl->move_path_active_id][0], pl->move_path[pl->move_path_active_id][1] };
 
 				float dist_from_target = sqrtf((active_target[0] - en->position[0]) * (active_target[0] - en->position[0]) + (active_target[1] - en->position[1]) * (active_target[1] - en->position[1])) + 1e-5;
@@ -927,6 +930,13 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					params[params_pos++] = players_it->second.inventory[ip].item_id;
 					params[params_pos++] = players_it->second.inventory[ip].item_param;
 				}
+#ifdef PATHING_DEBUG
+				params[params_pos++] = players_it->second.move_path_len - players_it->second.move_path_active_id + 1;
+				for (int mp = players_it->second.move_path_active_id-1; mp < players_it->second.move_path_len; mp++) {
+					params[params_pos++] = players_it->second.move_path[mp][0];
+					params[params_pos++] = players_it->second.move_path[mp][1];
+				}
+#endif
 			}
 		}
 		int steps = game_pw_thread_count;
@@ -1006,6 +1016,17 @@ void game_tick() {
 						//printf(" hit");
 						if (pl_target->health <= 0) {
 							pl_target->alive = false;
+
+#ifdef PATHING_DEBUG
+							struct entity* en = (struct entity*)&es[pl_target->entity_id];
+							int* params = (int*)&en->params;
+							int params_pos = 1;
+							for (int ip = 0; ip < 6; ip++) {
+								params_pos++;
+								params_pos++;
+							}
+							params[params_pos++] = 0;
+#endif
 							//object itself
 							grid_object_remove(&bf_rw, bf_rw.data, gd.position_in_bf, target_entity->position, { player_models[PT_HOPE].model_scale, player_models[PT_HOPE].model_scale, 1.0f }, { 0.0f, 0.0f, 0.0f }, model_get_max_position(&player_models[PT_HOPE]), pl_target->entity_id);
 							//object text

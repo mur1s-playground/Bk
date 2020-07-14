@@ -21,6 +21,10 @@
 #include "MapEditor.hpp"
 #include "Particle.hpp"
 
+#ifdef PATHING_DEBUG
+	#include "Pathing.hpp"
+#endif
+
 
 #include "time.h"
 #include "math.h"
@@ -289,6 +293,14 @@ int main(int argc, char** argv) {
 				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], game_ticks);
 			launch_draw_entities_kernel(bf_assets.device_data[0], bf_map.device_data[0], player_models_position, item_models_position, map_models_position, ui_fonts_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
 				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], mouse_position, game_ticks);
+
+#ifdef PATHING_DEBUG
+			launch_draw_pathing_kernel(
+				bf_assets.device_data[0],
+				bf_rw.device_data[0], entities_position, entities.size(),
+				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], game_ticks);
+#endif
+
 			if (!map_editor) {
 				launch_draw_storm_kernel(bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[2], camera[2], storm_current, storm_to, 50, { 45, 0, 100 });
 			}

@@ -1,6 +1,8 @@
 #ifndef MAIN_HPP
 #define MAIN_HPP
 
+#include "FeatureToggles.hpp"
+
 #include "Vector2.hpp"
 #include "Vector3.hpp"
 #include <vector>
