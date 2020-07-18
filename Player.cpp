@@ -10,6 +10,7 @@
 #include "Entity.hpp"
 #include "Playerlist.hpp"
 #include "Main.hpp"
+#include "Pathing.hpp"
 
 unsigned int                    player_models_position;
 map<player_type, struct model>  player_models;
@@ -85,6 +86,10 @@ void player_add(struct bit_field *bf_rw, string name, enum player_type pt, unsig
         p.move_path_active_id = 10;
         p.actions = 0;
         p.entity_id = entity_id;
+#ifndef BRUTE_PATHING
+        p.pathing_position = pathing_add(bf_rw, &bf_pathing);
+        p.pathing_calc_stage = -1;
+#endif
         players.try_emplace(name, p);
         playerlist_add(bf_rw, name.c_str());
     }

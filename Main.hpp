@@ -18,6 +18,10 @@ extern struct bit_field bf_map;
 extern struct bit_field bf_rw;
 extern struct bit_field bf_output;
 
+#ifndef BRUTE_PATHING
+	extern struct bit_field bf_pathing;
+#endif
+
 extern struct vector2<unsigned int> resolution;
 
 extern bool map_editor;

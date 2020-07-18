@@ -1,6 +1,7 @@
 #ifndef PLAYER_HPP
 #define PLAYER_HPP
 
+#include "FeatureToggles.hpp"
 #include <map>
 #include <atomic>
 #include <string>
@@ -48,7 +49,10 @@ struct player {
 	unsigned int			move_path_len;
 	unsigned int			move_path_active_id;
 	vector2<float>			move_path[10];
-
+#ifndef BRUTE_PATHING
+	unsigned int			pathing_position;
+	int						pathing_calc_stage;
+#endif
 	unsigned int			actions;
 	unsigned int			action_params[50];
 
@@ -75,6 +79,5 @@ void player_action_param_add(struct player* pl, const enum player_action_type pa
 void players_upload(struct bit_field* bf);
 bool players_process_left_click(vector2<unsigned int> position);
 void players_process_right_click(vector2<unsigned int> position);
-
 
 #endif

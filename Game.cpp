@@ -6,6 +6,9 @@
 #include <thread>
 #include <chrono>
 
+#include <immintrin.h>
+#include <xmmintrin.h>
+
 #include "Main.hpp"
 #include "Camera.hpp"
 #include "Grid.hpp"
@@ -19,6 +22,7 @@
 #include "AssetLoader.hpp"
 #include "TwitchIntegration.hpp"
 #include "Particle.hpp"
+#include "Pathing.hpp"
 
 #define rand() myrand()
 
@@ -33,6 +37,8 @@ atomic<bool>			game_tick_ready		= false;
 
 bool					game_cleanup		= false;
 
+long					tf_gametime_start = 0;
+
 DWORD WINAPI game_thread(LPVOID param) {
 	unsigned int frame_balancing = 0;
 	long tf_l = clock();
@@ -43,15 +49,22 @@ DWORD WINAPI game_thread(LPVOID param) {
 			WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
 			game_init();
 			game_start();
+#ifndef BRUTE_PATHING
+			bit_field_update_device(&bf_pathing, 0);
+#endif
 			camera_get_crop(camera_crop);
 			ui_set_active("ingame_overlay");
 			game_ticks = 0;
 			game_started = true;
+			tf_gametime_start = clock();
 			game_setup = false;
 			ReleaseMutex(bf_rw.device_locks[0]);
 			ReleaseMutex(bf_assets.device_locks[0]);
 		} else if (game_started) {
 			WaitForSingleObject(bf_rw.device_locks[0], INFINITE);
+#ifndef BRUTE_PATHING
+			bit_field_update_host(&bf_pathing, 0);
+#endif
 			game_tick();
 			ReleaseMutex(bf_rw.device_locks[0]);
 
@@ -631,7 +644,6 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 				}
 
 				unsigned char pathable = 0;
-
 				if (player_move_target_override_set.load()) {
 					if (player_selected_id == pl->entity_id) {
 						//printf("overriding\n");
@@ -639,6 +651,7 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 						pl->move_reason = PAT_MOVE;
 						pl->move_path_active_id = 10;
 						pl->move_path_len = 10;
+						new_move_target = true;
 						player_move_target_override_set.store(false);
 					}
 				}
@@ -653,9 +666,11 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 					pl->move_target = { en->position[0] + 256.0f/dist * ((float)storm_to.x - en->position[0]), en->position[1] + 256.0f / dist * ((float)storm_to.y - en->position[1]) };
 					pl->move_path_len = 10;
 					pl->move_path_active_id = 10;
+					new_move_target = true;
 					pl->move_reason = PAT_MOVE;
 				}
 				
+#ifdef BRUTE_PATHING
 				if (pl->move_path_active_id == pl->move_path_len) {
 					//(partial) path to target
 
@@ -696,51 +711,75 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 
 					while (!path_clear) {
 						path_clear = true;
-						//printf("not clear loop\n");
-						for (int pp = 0; pp < 9; pp++) {
-							float t_dist;
-							vector2<float> cur_pos = { pl->move_path[pp][0], pl->move_path[pp][1]};
-							float stepcount = 16.0f;
-							int loop = 1;
-							//TODO:: CHECK THE WHILE CONDITION
-							while ((t_dist = sqrtf((pl->move_path[pp+1][0] - cur_pos[0]) * (pl->move_path[pp + 1][0] - cur_pos[0]) + (pl->move_path[pp + 1][1] - cur_pos[1]) * (pl->move_path[pp + 1][1] - cur_pos[1]))) > 0.0f) {
-								cur_pos[0] = pl->move_path[pp][0] + (loop/stepcount) * (pl->move_path[pp + 1][0] - pl->move_path[pp][0]);
-								cur_pos[1] = pl->move_path[pp][1] + (loop/stepcount) * (pl->move_path[pp + 1][1] - pl->move_path[pp][1]);
-								loop++;
-								//cur_pos[1] = pl->move_path[pp + 1][1];
+#ifdef AVX_CAPABILITY
+						for (int p_ = 0; p_ < 2; p_++) {
+							//printf("not clear loop\n");
+							__m256 mp = _mm256_load_ps((float*)&pl->move_path[p_*4]);
+							__m256 mp1 = _mm256_load_ps((float*)&pl->move_path[p_*4+1]);
 
-								if (pathables[(int)floorf(cur_pos[1]) * gm.map_dimensions[0] + (int)floorf(cur_pos[0])] == 0) {
-									//printf("pl_eid %i, pp %i, not pathable %f %f\n", pl->entity_id, pp, cur_pos[0], cur_pos[1]);
-									/*
-									if (pp < path_unclear_pp) {
-										//walk current best, till past where it broke
-										for (int pp_t = 0; pp_t < path_unclear_pp; pp_t++) {
-											pl->move_path[pp_t][0] = best_move_path_candidate[pp_t][0];
-											pl->move_path[pp_t][1] = best_move_path_candidate[pp_t][1];
+							__m256 stepsize_m = _mm256_set1_ps(1.0f / 16.0f);
+
+							__m256 mp_dir = _mm256_mul_ps(stepsize_m, _mm256_sub_ps(mp1, mp));
+							__m256 cur_pos_m = mp;
+
+							float* cur_pos_arr = new float[8];
+
+							int loop = 1;
+							do {
+								cur_pos_m = _mm256_add_ps(cur_pos_m, mp_dir);
+
+								_mm256_store_ps(cur_pos_arr, cur_pos_m);
+
+								for (int pp = 0; pp < 4; pp++) {
+									if (pathables[(int)floorf(cur_pos_arr[pp * 2 + 1]) * gm.map_dimensions[0] + (int)floorf(cur_pos_arr[pp * 2])] == 0) {
+										for (int pp_t = 0; pp_t < p_*4+pp; pp_t++) {
+											best_move_path_candidate[pp_t][0] = pl->move_path[pp_t][0];
+											best_move_path_candidate[pp_t][1] = pl->move_path[pp_t][1];
 										}
-										pl->move_path_len = pp;
+										path_unclear_pp = p_ * 4 + pp;
+										path_clear = false;
 										break;
-									} else {
-										if (pp > path_unclear_pp && path_unclear_pp > 0) {
-											//walk current partially, till 1 segment past where it broke before optimising
-											pl->move_path_len = path_unclear_pp;
-										} else {
-											//optimise further*/
-											for (int pp_t = 0; pp_t < pp; pp_t++) {
-												best_move_path_candidate[pp_t][0] = pl->move_path[pp_t][0];
-												best_move_path_candidate[pp_t][1] = pl->move_path[pp_t][1];
-											}
-											path_unclear_pp = pp;
-											path_clear = false;
-										//}
-									//}
+									}
+									if (!path_clear) break;
+								}
+								if (!path_clear) break;
+								loop++;
+							} while (loop <= 16);
+							if (!path_clear) break;
+						}
+
+						if (path_clear) {
+							for (int pp = 8; pp < 9; pp++) {
+#else //NO AVX
+						for (int pp = 0; pp < 9; pp++) {
+#endif
+								float t_dist;
+								vector2<float> cur_pos = { pl->move_path[pp][0], pl->move_path[pp][1] };
+								float stepcount = 16.0f;
+								int loop = 1;
+								//TODO:: CHECK THE WHILE CONDITION
+								while ((t_dist = sqrtf((pl->move_path[pp + 1][0] - cur_pos[0]) * (pl->move_path[pp + 1][0] - cur_pos[0]) + (pl->move_path[pp + 1][1] - cur_pos[1]) * (pl->move_path[pp + 1][1] - cur_pos[1]))) > 0.0f) {
+									cur_pos[0] = pl->move_path[pp][0] + (loop / stepcount) * (pl->move_path[pp + 1][0] - pl->move_path[pp][0]);
+									cur_pos[1] = pl->move_path[pp][1] + (loop / stepcount) * (pl->move_path[pp + 1][1] - pl->move_path[pp][1]);
+									loop++;
+
+									if (pathables[(int)floorf(cur_pos[1]) * gm.map_dimensions[0] + (int)floorf(cur_pos[0])] == 0) {
+										for (int pp_t = 0; pp_t < pp; pp_t++) {
+											best_move_path_candidate[pp_t][0] = pl->move_path[pp_t][0];
+											best_move_path_candidate[pp_t][1] = pl->move_path[pp_t][1];
+										}
+										path_unclear_pp = pp;
+										path_clear = false;
+										break;
+									}
+								}
+								if (!path_clear) {
 									break;
 								}
 							}
-							if (!path_clear) {
-								break;
-							}
+#ifdef AVX_CAPABILITY
 						}
+#endif
 						if (!path_clear) {
 							bool path_valid = false;
 							while (!path_valid) {
@@ -785,33 +824,122 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 													best_move_path_candidate[i][1] = pl->move_path[i][1];
 												}
 											} else {
-												printf("path not found from %f %f to %f %f over: %f %f, move_reason %d\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1], partial_target[0], partial_target[1], pl->move_reason);
-												pl->move_path[0][0] = en->position[0];
-												pl->move_path[0][1] = en->position[1];
-												pl->move_path[1][0] = en->position[0];
-												pl->move_path[1][1] = en->position[1];
-												pl->move_path_active_id = 1;
-												pl->move_path_len = 2;
-												pl->move_target = { en->position[0], en->position[1] };
+												printf("path not found from %f %f to %f %f over: %f %f ...\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1], partial_target[0], partial_target[1]);
+												pl->move_target = { en->position[0] + (rand() / (float)RAND_MAX - 0.5f) * 5.0f, en->position[1] + (rand() / (float)RAND_MAX - 0.5f) * 5.0f };
+												for (int mpc = 1; mpc < 10; mpc++) {
+													pl->move_path[mpc][0] = pl->move_target[0];
+													pl->move_path[mpc][1] = pl->move_target[1];
+												}
+												shift_param = 0.0f;
+												shift_param_o = 0.0f;
+												shift_param_o2 = 0.0f;
 												pl->move_reason = PAT_MOVE;
-												path_clear = true;
 												break;
 											}
 										} else {
 											printf("path not found from %f %f to %f %f over: %f %f ...\n", en->position[0], en->position[1], pl->move_target[0], pl->move_target[1], partial_target[0], partial_target[1]);
-											pl->move_path[0][0] = en->position[0];
-											pl->move_path[0][1] = en->position[1];
-											pl->move_path[1][0] = en->position[0];
-											pl->move_path[1][1] = en->position[1];
-											pl->move_path_active_id = 1;
-											pl->move_path_len = 2;
-											pl->move_target = { en->position[0], en->position[1] };
+											pl->move_target = { en->position[0] + (rand() / (float)RAND_MAX - 0.5f) * 5.0f, en->position[1] + (rand() / (float)RAND_MAX - 0.5f) * 5.0f };
+											for (int mpc = 1; mpc < 10; mpc++) {
+												pl->move_path[mpc][0] = pl->move_target[0];
+												pl->move_path[mpc][1] = pl->move_target[1];
+											}
+											shift_param = 0.0f;
+											shift_param_o = 0.0f;
+											shift_param_o2 = 0.0f;
 											pl->move_reason = PAT_MOVE;
-											path_clear = true;
 											break;
 										}
 									}
 								}
+#ifdef AVX_CAPABILITY								
+								float* cp_f = new float[8];
+								float* pt_dir_f = new float[8];
+								for (int i = 0; i < 4; i++) {
+									cp_f[i * 2] = en->position[0];
+									cp_f[i * 2 + 1] = en->position[1];
+									pt_dir_f[i * 2] = partial_target_dir[0];
+									pt_dir_f[i * 2 + 1] = partial_target_dir[1];
+								}
+								__m256 cp = _mm256_load_ps(cp_f);
+								__m256 pt_dir_m = _mm256_load_ps(pt_dir_f);
+								__m256 shift_param_m = _mm256_broadcast_ss(&shift_param);
+
+								__m256 distinc_m = _mm256_set_ps(	4.0f/9.0f, 4.0f / 9.0f,
+																	3.0f/9.0f, 3.0f / 9.0f,
+																	2.0f/9.0f, 2.0f / 9.0f,
+																	1.0f/9.0f, 1.0f / 9.0f
+																	);
+
+								__m256 fourninth_m = _mm256_set1_ps(4.0f/9.0f);
+
+								cp = _mm256_add_ps(cp, _mm256_mul_ps(distinc_m, pt_dir_m));
+
+								float* t2_package = new float[8];
+								for (int t2p = 0; t2p < 4; t2p++) {
+									t2_package[t2p * 2]		= shift_param * shift_indicator * partial_target_dir_orth[0];
+									t2_package[t2p * 2 + 1] = shift_param * shift_indicator * partial_target_dir_orth[1];
+								}
+								__m256 t2_package_m = _mm256_load_ps(t2_package);
+
+								__m256 map_ubounds_m = _mm256_set_ps(gm.map_dimensions[1], gm.map_dimensions[0], 
+																	 gm.map_dimensions[1], gm.map_dimensions[0], 
+																	 gm.map_dimensions[1], gm.map_dimensions[0], 
+																	 gm.map_dimensions[1], gm.map_dimensions[0]);
+
+								for (int p_ = 0; p_ < 2; p_++) {
+				
+									float* sin_tilde_f = new float[8];
+									for (int so = 0; so < 4; so++) {
+										sin_tilde_f[so*2]	= (p_ * 4 + 1 + so <= path_unclear_pp) * sin((p_*4 + 1 + so) / ((float)path_unclear_pp + (path_unclear_pp == 0)) * 3.1415f / 2.0f) + 
+															 !(p_ * 4 + 1 + so <= path_unclear_pp) * sin((9 - (p_ * 4 + 1 + so)) / ((float)(9 - path_unclear_pp + (path_unclear_pp == 8) - 1)) * 3.1415f / 2.0f);
+										sin_tilde_f[so*2+1] = sin_tilde_f[so * 2];
+										//printf("sf %i %i %i %f %f\n", p_, so, path_unclear_pp, sin_tilde_f[so*2], sin_tilde_f[so * 2 + 1]);
+									}
+									__m256 sin_tilde_m = _mm256_load_ps(sin_tilde_f);
+
+									float* t3_package = new float[8];
+									for (int t3p = 0; t3p < 4; t3p++) {
+										t3_package[t3p * 2]		=	shift_param_o  * -1 *  (p_ * 4 + 1 + t3p <= path_unclear_pp + 1) +
+																	shift_param_o2 *  1 * !(p_ * 4 + 1 + t3p <= path_unclear_pp + 1);
+
+										t3_package[t3p * 2 + 1] = t3_package[t3p * 2];
+									}
+									__m256 t3_package_m = _mm256_load_ps(t3_package);
+									t3_package_m = _mm256_mul_ps(t3_package_m, pt_dir_m);
+
+									float* sin_o_tilde = new float[8];
+									for (int so = 0; so < 4; so++) {
+										sin_o_tilde[so * 2]	  = (p_*4 + 1 + so <= path_unclear_pp + 1)*(
+																			(path_unclear_pp == 0) + 
+																			(path_unclear_pp == 0) * sin((p_ * 4 + 1 + so) / ((float)path_unclear_pp + 1) * 3.1415f / 2.0f)) 
+																	+
+																!(p_ * 4 + 1 + so <= path_unclear_pp + 1)*(
+																			(path_unclear_pp == 7) +
+																			!(path_unclear_pp == 7) * sin((1 - ((p_ * 4 + 1 + so) - (path_unclear_pp + 2)) / (9.0f - ((float)path_unclear_pp + (path_unclear_pp == 7) + 2))) * 3.1415f / 2.0f));
+																
+										sin_o_tilde[so * 2 + 1] = sin_o_tilde[so * 2];
+									}
+									__m256 sin_o_tilde_m = _mm256_load_ps(sin_o_tilde);
+
+									__m256 res_m = _mm256_add_ps(_mm256_add_ps(
+																		cp,
+																		_mm256_mul_ps(t2_package_m, sin_tilde_m)),
+																		_mm256_mul_ps(t3_package_m, sin_o_tilde_m));
+
+									__m256 cmp_l = _mm256_cmp_ps(res_m, _mm256_setzero_ps(), _CMP_GE_OQ);
+									__m256 cmp_u = _mm256_cmp_ps(res_m, map_ubounds_m, _CMP_LT_OQ);
+									int cmp_l_m = _mm256_movemask_ps(cmp_l);
+									int cmp_l_u = _mm256_movemask_ps(cmp_u);
+
+									if (cmp_l_m < 255 || cmp_l_u < 255) {
+										path_valid = false;
+										break;
+									} else {
+										_mm256_store_ps((float*)&pl->move_path[p_ * 4 + 1], res_m);
+									}
+									cp = _mm256_add_ps(cp, _mm256_mul_ps(fourninth_m, pt_dir_m));
+								}
+#else	//NO AVX
 								for (int i = 0; i < 10; i++) {
 									float sin_tilde = 0.0f;
 									float sin_o_tilde = 0.0f;
@@ -870,13 +998,40 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 										break;
 									}
 								}
+#endif
 							}
+
 						} else {
 							pl->move_target = partial_target;
 						}
 					}
 				}
+				
 				vector2<float> active_target = { pl->move_path[pl->move_path_active_id][0], pl->move_path[pl->move_path_active_id][1] };
+				
+#else
+				struct path *p = (struct path*)&bf_rw.data[pl->pathing_position];
+
+				if (new_move_target) {
+					pl->pathing_calc_stage = -1;
+				}
+
+				vector2<float> np = { 0.0f, 0.0f };
+				if (pl->pathing_calc_stage == -1) {
+					printf("%i setting new path\n", pl->entity_id);
+					pathing_set(&bf_rw, pl->pathing_position, vector2<float>(en->position[0], en->position[1]), pl->move_target);
+					pl->pathing_calc_stage = 0;
+				} else if (pl->pathing_calc_stage < 10) {
+					printf("%i calculating new path %i\n", pl->entity_id, pl->pathing_calc_stage);
+					pathing_get(&bf_rw, pl->pathing_position, &bf_pathing, &bf_map, pl->pathing_calc_stage);
+					pl->pathing_calc_stage++;
+				} else if (pl->pathing_calc_stage == 10) {
+					np = pathing_get_next(&bf_rw, pl->pathing_position, &bf_pathing, vector2<float>(en->position[0], en->position[1]));
+					if (np[0] == 0.0f && np[1] == 0) pl->pathing_calc_stage = -1;
+				}
+				vector2<float> active_target = { en->position[0] + np[0], en->position[1] + np[1] };
+				//printf("%f %f %f %f\n", en->position[0], np[0], en->position[1], np[1]);
+#endif
 
 				float dist_from_target = sqrtf((active_target[0] - en->position[0]) * (active_target[0] - en->position[0]) + (active_target[1] - en->position[1]) * (active_target[1] - en->position[1])) + 1e-5;
 
@@ -949,6 +1104,7 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 }
 
 void game_tick() {
+	
 	HANDLE game_wthreads[4];
 	int game_wthreads_params[4];
 	for (int i = 0; i < game_pw_thread_count; i++) {
@@ -957,7 +1113,7 @@ void game_tick() {
 	}
 
 	WaitForMultipleObjects(4, game_wthreads, TRUE, INFINITE);
-
+	
 		map<string, struct player>::iterator players_it = players.begin();
 		//players_it = players.begin();
 		struct entity* es = (struct entity*) & bf_rw.data[entities_position];
@@ -1040,12 +1196,14 @@ void game_tick() {
 							killfeed_add(&bf_rw, pl->name, pl_target->name);
 							leaderboard_add(&bf_rw, pl_target->name, pl_target->damage_dealt, pl_target->kills, pl->name);
 						} else {
+#ifdef PARTICLE_SYSTEM
 							if (pl->entity_id < UINT_MAX) {
 								struct entity* en = (struct entity*)&es[pl->entity_id];
 								float delta_x_off = 6*cos((en->orientation + 210) / 180.0f * 3.1415f);
 								float delta_y_off = -5*sin((en->orientation + 210) / 180.0f * 3.1415f);
 								particle_add(&bf_rw, 120, vector2<float>(en->position[0] + 12 + delta_x_off, en->position[1] + 12 + delta_y_off), vector2<float>(target_entity->position[0] + 12, target_entity->position[1] + 12), 8.0f);
 							}
+#endif
 						}
 					}
 				} else if (pap_start[0] == PAT_PICKUP_ITEM) {
@@ -1177,15 +1335,16 @@ void game_tick() {
 					//for (int i = 0; i < players.size(); i++) {
 					struct player* pl = &players_it->second;
 					if (pl->alive) {
-						if (kill_count == players.size() - 1) {
+						if (kill_count >= players.size() - 1) {
 							ui_textfield_set_value(&bf_rw, "ingame_menu", "top_placement", pl->name);
 							char tmp[2];
 							tmp[0] = 32;
 							tmp[1] = '\0';
 							leaderboard_add(&bf_rw, pl->name, pl->damage_dealt, pl->kills, tmp);
 							pl->alive = false;
-							game_ticks_target = 35;
+							game_ticks_target = 30;
 							ui_set_active("ingame_menu");
+							printf("gametime %ld\n", clock() - tf_gametime_start);
 						}
 						if (pl->entity_id < UINT_MAX) {
 							//printf("%i ", pl->entity_id);
@@ -1213,8 +1372,9 @@ void game_tick() {
 					players_it++;
 				}
 			}
-
+#ifdef PARTICLE_SYSTEM
 		particles_tick(&bf_rw);
+#endif
 }
 
 void game_destroy() {

@@ -20,10 +20,7 @@
 #include "Game.hpp"
 #include "MapEditor.hpp"
 #include "Particle.hpp"
-
-#ifdef PATHING_DEBUG
-	#include "Pathing.hpp"
-#endif
+#include "Pathing.hpp"
 
 
 #include "time.h"
@@ -46,6 +43,10 @@ struct bit_field bf_assets;
 struct bit_field bf_map;
 struct bit_field bf_rw;
 struct bit_field bf_output;
+
+#ifndef BRUTE_PATHING
+struct bit_field bf_pathing;
+#endif
 
 struct vector2<unsigned int> resolution;
 
@@ -148,7 +149,13 @@ int main(int argc, char** argv) {
 	item_models_init(&bf_assets);
 
 	bit_field_update_device(&bf_assets, 0);
-	
+
+#ifndef BRUTE_PATHING
+	// -- PATHING -- //
+	bit_field_init(&bf_pathing, 16, 1024);
+	bit_field_register_device(&bf_pathing, 0);
+#endif
+
 	///////////////////////////
 	// -- OUTPUT BITFIELD -- //
 	///////////////////////////
@@ -288,19 +295,36 @@ int main(int argc, char** argv) {
 			camera_move_z_tick();
 			camera_get_crop(camera_crop);
 			launch_draw_map(bf_map.device_data[0], gm.map_zoom_level_count, gm.map_zoom_center_z, gm.map_zoom_level_offsets_position, gm.map_positions, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[1], camera_crop[2], camera_crop[3], bf_output.device_data[0], output_position, 1920, 1080);
+#ifdef PARTICLE_SYSTEM
 			launch_draw_particles_kernel(bf_assets.device_data[0],
 				bf_rw.device_data[0], particles_position,
 				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], game_ticks);
-			launch_draw_entities_kernel(bf_assets.device_data[0], bf_map.device_data[0], player_models_position, item_models_position, map_models_position, ui_fonts_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
-				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], mouse_position, game_ticks);
+#endif
 
 #ifdef PATHING_DEBUG
+	#ifdef BRUTE_PATHING
 			launch_draw_pathing_kernel(
 				bf_assets.device_data[0],
 				bf_rw.device_data[0], entities_position, entities.size(),
 				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], game_ticks);
+	#else
+			map<string, struct player>::iterator players_it = players.begin();
+			while (players_it != players.end()) {
+				if (players_it->second.entity_id == player_selected_id) {
+					launch_draw_gpu_kernel(
+						bf_rw.device_data[0], players_it->second.pathing_position,
+						bf_pathing.device_data[0],
+						bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], game_ticks);
+					break;
+				}
+				players_it++;
+			}
+	#endif
 #endif
-
+			
+			launch_draw_entities_kernel(bf_assets.device_data[0], bf_map.device_data[0], player_models_position, item_models_position, map_models_position, ui_fonts_position, bf_rw.device_data[0], entities_position, gd.position_in_bf, gd.data_position_in_bf,
+				bf_output.device_data[0], output_position, 1920, 1080, 4, camera_crop[0], camera_crop[2], camera[2], mouse_position, game_ticks);
+			
 			if (!map_editor) {
 				launch_draw_storm_kernel(bf_output.device_data[0], output_position, resolution[0], resolution[1], 4, camera_crop[0], camera_crop[2], camera[2], storm_current, storm_to, 50, { 45, 0, 100 });
 			}
