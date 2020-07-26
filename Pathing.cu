@@ -64,30 +64,22 @@ void pathing_get(struct bit_field* bf_rw, unsigned int pathing_position, struct 
 vector2<float> pathing_get_next(struct bit_field* bf_rw, unsigned int pathing_position, struct bit_field* bf_pathing, struct vector2<float> position) {
 	struct path* p = (struct path*)&bf_rw->data[pathing_position];
 
-	float delta_x = 0.0f;
-	float delta_y = 0.0f;
-
-	vector2<int> min_rc = { 0, 0 };
-	int min_val = INT_MAX;
-
+	vector2<float> min_rc = { 0.0f, 0.0f };
 	vector2<unsigned int> position_in_path = { (unsigned int)floorf(position[0]) - p->pathing_x1y1[0], (unsigned int)floorf(position[1]) - p->pathing_x1y1[1] };
 
-	int* pathing_data = (int*)&bf_pathing->data[p->pathing_data];	
+	float* pathing_data = (float*)&bf_pathing->data[p->pathing_data];	
 	for (int r = -1; r <= 1; r++) {
 		for (int c = -1; c <= 1; c++) {
 			if (r == 0 && c == 0) continue;
 			vector2<int> cur_position_in_path = { (int)position_in_path[0] + c, (int)position_in_path[1] + r};
 			if (cur_position_in_path[0] >= 0 && cur_position_in_path[0] < p->resolution[0] && cur_position_in_path[1] >= 0 && cur_position_in_path[1] < p->resolution[1]) {
-				
-				int cur_val = pathing_data[cur_position_in_path[1] * p->resolution[0] + cur_position_in_path[0]];
-				if (cur_val < min_val && cur_val > 0) {
-					min_val = cur_val;
-					min_rc = { c, r };
-				}
+				float cur_val = pathing_data[cur_position_in_path[1] * p->resolution[0] + cur_position_in_path[0]];
+				min_rc = { min_rc[0] + c * cur_val, min_rc[1] + r * cur_val };
 			}
 		}
 	}
-	return vector2<float>((float)min_rc[0], (float)min_rc[1]);
+	float n = sqrtf(min_rc[0] * min_rc[0] + min_rc[1] * min_rc[1]) + 1e-5;
+	return vector2<float>(-min_rc[0]/n, -min_rc[1]/n);
 }
 
 __global__ void calculate_pathing_kernel(
@@ -96,73 +88,65 @@ __global__ void calculate_pathing_kernel(
 		const unsigned int* device_data_map, const unsigned int map_pathables
 	) {
 
-		int i = blockIdx.x * blockDim.x + threadIdx.x;
+		int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+		int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 
 		struct path* p = (struct path*)&device_data_rw[path_position];
 
-		if (i < p->resolution[0] * p->resolution[1]) {
-			int p_row = i / p->resolution[0];
-			int p_col = i % p->resolution[0];
+		if (j < p->resolution[1] && i < p->resolution[0]) {
+			int p_row = j;
+			int p_col = i;
 
 			int p_game_row = p->pathing_x1y1[1] + p_row;
 			int p_game_col = p->pathing_x1y1[0] + p_col;
 
-			int* path_d = (int*)&device_data_pathing[p->pathing_data];
+			float* path_d = (float*)&device_data_pathing[p->pathing_data];
 
 			if (path_calc_stage == 0) {
 				p->path_calc_stage = 0;
 				unsigned char* frame_pathable = (unsigned char*)&device_data_map[map_pathables];
-				path_d[p_row * p->resolution[1] + p_col] = INT_MAX;
+				path_d[p_row * p->resolution[0] + p_col] = FLT_MAX;
 
 				bool set = false;
-				
+
 				if (p_game_row >= map_dimensions_center[1] || p_game_col >= map_dimensions_center[0] || frame_pathable[(int)floorf(p_game_row) * map_dimensions_center[0] + (int)floorf(p_game_col)] == 0) {
-					path_d[p_row * p->resolution[0] + p_col] = 0;
+					path_d[p_row * p->resolution[0] + p_col] = 0.0f;
 					set = true;
 				} else if ((int)floorf(p->from[0]) == p_game_col && (int)floorf(p->from[1]) == p_game_row) {
-					path_d[p_row * p->resolution[0] + p_col] = 1;
+					path_d[p_row * p->resolution[0] + p_col] = 1.0f;
 					set = true;
 				}
-				
+			} else if (path_calc_stage > 0) {
+				bool set = false;
 				int lc = 0;
-				while (p->path_calc_stage == 0 && !set && lc < max(p->resolution[0], p->resolution[1])) {
-					int candidate_from = INT_MAX;
-					int current = path_d[p_row * p->resolution[0] + p_col];
+				while (path_calc_stage > 0 && !set && lc < max(p->resolution[0], p->resolution[1])) {
+					if (path_calc_stage % 2 == 0 && (j % 32 == 0 || i % 32 == 0)) return;
+					if (path_calc_stage % 2 == 1 && (j % 32 != 0 && i % 32 != 0)) return;
+					float candidate_from = FLT_MAX;
+					float current = path_d[p_row * p->resolution[0] + p_col];
+					if (current == 1.0f || current == 0.0f) break;
+					bool contains_non_pathable_neighbours = false;
 					for (int dr = -1; dr <= 1; dr++) {
 						for (int dc = -1; dc <= 1; dc++) {
 							if (dr == 0 && dc == 0) continue;
 							if (p_game_row + dr >= p->pathing_x1y1[1] && p_game_row + dr <= p->pathing_x2y2[1] && p_game_col + dc >= p->pathing_x1y1[0] && p_game_col + dc <= p->pathing_x2y2[0]) {
-								int cur_val = path_d[(p_row + dr) * p->resolution[0] + p_col + dc];
-								if (cur_val < INT_MAX && cur_val > 0 && cur_val < candidate_from) {
-									candidate_from = cur_val;
+								float dst = sqrtf(dc*dc + dr*dr);
+								float cur_val = path_d[(p_row + dr) * p->resolution[0] + p_col + dc];
+								if (cur_val > 0 && cur_val+dst < candidate_from) {
+									candidate_from = cur_val+dst;
+								} else if (cur_val == 0) {
+									contains_non_pathable_neighbours = true;
 								}
 							}
 						}
-					}
-					if (candidate_from < INT_MAX && candidate_from < current) {
-						path_d[p_row * p->resolution[0] + p_col] = candidate_from+1;
 					}
 					__syncthreads();
-					lc++;
-				}
-			} else if (path_calc_stage > 0) {
-				int lc = 0;
-				while (path_calc_stage > 0 && lc < max(p->resolution[0], p->resolution[1])) {
-					int candidate_from = INT_MAX;
-					int current = path_d[p_row * p->resolution[0] + p_col];
-					for (int dr = -1; dr <= 1; dr++) {
-						for (int dc = -1; dc <= 1; dc++) {
-							if (dr == 0 && dc == 0) continue;
-							if (p_game_row + dr >= p->pathing_x1y1[1] && p_game_row + dr <= p->pathing_x2y2[1] && p_game_col + dc >= p->pathing_x1y1[0] && p_game_col + dc <= p->pathing_x2y2[0]) {
-								int cur_val = path_d[(p_row + dr) * p->resolution[0] + p_col + dc];
-								if (cur_val > 0 && cur_val < candidate_from) {
-									candidate_from = cur_val;
-								}
-							}
-						}
-					}
-					if (candidate_from < INT_MAX && candidate_from < current) {
-						path_d[p_row * p->resolution[0] + p_col] = candidate_from + 1;
+					if (contains_non_pathable_neighbours && candidate_from < FLT_MAX) {
+						path_d[p_row * p->resolution[0] + p_col] = candidate_from + 10;
+						//set = true;
+					} else if (candidate_from < FLT_MAX) {
+						path_d[p_row * p->resolution[0] + p_col] = candidate_from;
+						//set = true;
 					}
 					__syncthreads();
 					lc++;
@@ -178,11 +162,15 @@ void launch_calculate_pathing_kernel(const struct path *p,
 
 	cudaError_t err = cudaSuccess;
 
-	int threadsPerBlock = 256;
-	int blocksPerGrid = (p->resolution[0]*p->resolution[1] + threadsPerBlock - 1) / threadsPerBlock;
+	dim3 threadsPerBlock(32, 32);
 
+	dim3 blocksPerGrid((p->resolution[0] + 31) / threadsPerBlock.x, (p->resolution[1] + 31) / threadsPerBlock.y);
+
+	//int threadsPerBlock = 1024;
+	//int blocksPerGrid = (p->resolution[0]*p->resolution[1] + threadsPerBlock - 1) / threadsPerBlock;
+	
 	calculate_pathing_kernel << <blocksPerGrid, threadsPerBlock >> > (device_data_rw, path_position, device_data_pathing, path_calc_stage,
-		map_dimensions_center, device_data_map, map_pathables);
+			map_dimensions_center, device_data_map, map_pathables);
 		err = cudaGetLastError();
 
 		if (err != cudaSuccess) {
@@ -190,6 +178,7 @@ void launch_calculate_pathing_kernel(const struct path *p,
 		}
 
 		cudaDeviceSynchronize();
+	
 }
 #endif
 
@@ -197,11 +186,13 @@ void launch_calculate_pathing_kernel(const struct path *p,
 
 #ifndef BRUTE_PATHING
 
+int p_draw_type = 0;
+
 __global__ void draw_gpu_pathing_kernel(
 	unsigned int* device_data_rw, const unsigned int pathing_position,
 	unsigned int* device_data_pathing,
 	unsigned int* device_data_output, const unsigned int output_position, const unsigned int output_width, const unsigned int output_height, const unsigned int output_channels,
-	const unsigned int camera_x1, const unsigned int camera_y1, const float camera_z, const unsigned int tick_counter) {
+	const unsigned int camera_x1, const unsigned int camera_y1, const float camera_z, const unsigned int tick_counter, const unsigned int p_draw_type) {
 
 	int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -213,33 +204,97 @@ __global__ void draw_gpu_pathing_kernel(
 
 		int current_game_x = (int)floorf(camera_x1 + current_x * camera_z);
 		int current_game_y = (int)floorf(camera_y1 + current_y * camera_z);
+
 		
 		if (current_game_x >= p->pathing_x1y1[0] && current_game_x < p->pathing_x2y2[0] && current_game_y >= p->pathing_x1y1[1] && current_game_y < p->pathing_x2y2[1]) {
-			int* path_data = (int*)&device_data_pathing[p->pathing_data];
+			float* path_data = (float*)&device_data_pathing[p->pathing_data];
 			
 			int r = current_game_y - (int)p->pathing_x1y1[1];
 			int c = current_game_x - (int)p->pathing_x1y1[0];
 
-			unsigned char* output = (unsigned char*)&device_data_output[output_position];
-			
-			if (path_data[r * p->resolution[0] + c] == 1 || path_data[r * p->resolution[0] + c] == -1) {
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255;
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255;
-			} else if (path_data[r * p->resolution[0] + c] == INT_MAX) {
+			if (p_draw_type == 0) {
 
-			} else if (path_data[r * p->resolution[0] + c] < 0) {
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 0;
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = (char)(-path_data[r * p->resolution[0] + c] / 3.0f);
-			} else if (path_data[r * p->resolution[0] + c] > 0) {
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = (char)(path_data[r * p->resolution[0] + c] / 3.0f);
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
-			} else if (path_data[r * p->resolution[0] + c] == 0) {
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 0;
-				output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
+				unsigned char* output = (unsigned char*)&device_data_output[output_position];
+
+				float cur_val = path_data[r * p->resolution[0] + c];
+
+				if (cur_val == 1 || cur_val == -1) {
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255;
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255;
+				} else if (cur_val == INT_MAX) {
+
+				} else if (cur_val < 0) {
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 0;
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = (char)(-cur_val / 2.0f);
+				} else if (cur_val > 0) {
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = (char)(cur_val / 2.0f);
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
+				} else if (cur_val == 0) {
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 0;
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
+				}
+			} else if (p_draw_type == 1) {
+				unsigned char* output = (unsigned char*)&device_data_output[output_position];
+
+				vector2<float> min_rc = { 0.0f, 0.0f };
+				
+				float cur_val = path_data[r * p->resolution[0] + c];
+
+				if (cur_val == 1 || cur_val == -1) {
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255;
+					output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 255;
+					return;
+				}
+
+				if (current_game_x % 6 == 0 && current_game_y % 6 == 0) {
+
+					for (int dr = -1; dr <= 1; dr++) {
+						for (int dc = -1; dc <= 1; dc++) {
+							if (dc == 0 && dr == 0) continue;
+							if ((r + dr) >= 0 && (r + dr) < p->resolution[1] && (c + dc) >= 0 && (c + dc) < p->resolution[0]) {
+								float cur_val = path_data[(r + dr) * p->resolution[0] + c + dc];
+								if (cur_val == 0) return;
+								min_rc = { min_rc[0] + dc * cur_val, min_rc[1] + dr * cur_val };
+							}
+						}
+					}
+					float n = sqrtf(min_rc[0] * min_rc[0] + min_rc[1] * min_rc[1]) + 1e-5;
+					min_rc = { min_rc[0] / n, min_rc[1] / n };
+
+					float stepsize = 1.0f;
+					vector2<int> cur_pos;
+					for (int s = 0; s < 10; s++) {
+						cur_pos = { (int)roundf(current_x + s * stepsize * min_rc[0]), (int)roundf(current_y + s * stepsize * min_rc[1]) };
+						if (cur_pos[0] >= 0 && cur_pos[0] < output_width && cur_pos[1] >= 0 && cur_pos[1] < output_height) {
+							output[cur_pos[1] * (output_width * output_channels) + cur_pos[0] * output_channels + 0] = 0;
+							output[cur_pos[1] * (output_width * output_channels) + cur_pos[0] * output_channels + 1] = 0;
+							output[cur_pos[1] * (output_width * output_channels) + cur_pos[0] * output_channels + 2] = 0;
+						}
+					}
+					vector2<int> cur_pos2 = cur_pos;
+					vector2<float> min_a1 = { min_rc[1], -min_rc[0] };
+					vector2<float> min_a2 = { -min_rc[1], min_rc[0] };
+					//min_rc = { -min_rc[0], -min_rc[1] };
+					for (int a = 0; a < 5; a++) {
+						cur_pos  = { (int)roundf(current_x + a * stepsize * (2.0f/4.0f * min_a1[0] + 2.0f/4.0f * min_rc[0])), (int)roundf(current_y + a * stepsize * (2.0f / 4.0f * min_a1[1] + 2.0f / 4.0f * min_rc[1])) };
+						cur_pos2 = { (int)roundf(current_x + a * stepsize * (2.0f/4.0f * min_a2[0] + 2.0f/4.0f * min_rc[0])), (int)roundf(current_y + a * stepsize * (2.0f / 4.0f * min_a2[1] + 2.0f / 4.0f * min_rc[1])) };
+						if (cur_pos[0] >= 0 && cur_pos[0] < output_width && cur_pos[1] >= 0 && cur_pos[1] < output_height) {
+							output[cur_pos[1] * (output_width * output_channels) + cur_pos[0] * output_channels + 0] = 0;
+							output[cur_pos[1] * (output_width * output_channels) + cur_pos[0] * output_channels + 1] = 0;
+							output[cur_pos[1] * (output_width * output_channels) + cur_pos[0] * output_channels + 2] = 0;
+						}
+						if (cur_pos2[0] >= 0 && cur_pos2[0] < output_width && cur_pos2[1] >= 0 && cur_pos2[1] < output_height) {
+							output[cur_pos2[1] * (output_width * output_channels) + cur_pos2[0] * output_channels + 0] = 0;
+							output[cur_pos2[1] * (output_width * output_channels) + cur_pos2[0] * output_channels + 1] = 0;
+							output[cur_pos2[1] * (output_width * output_channels) + cur_pos2[0] * output_channels + 2] = 0;
+						}
+					}
+				}
 			}
 		}
 	}
@@ -258,7 +313,7 @@ void launch_draw_gpu_kernel(
 
 		draw_gpu_pathing_kernel << <blocksPerGrid, threadsPerBlock >> > (device_data_rw, pathing_position, device_data_pathing,
 			device_data_output, output_position, output_width, output_height, output_channels,
-			camera_x1, camera_y1, camera_z, tick_counter);
+			camera_x1, camera_y1, camera_z, tick_counter, p_draw_type);
 		err = cudaGetLastError();
 
 		if (err != cudaSuccess) {

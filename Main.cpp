@@ -247,6 +247,13 @@ int main(int argc, char** argv) {
 
 			if (sdl_event.type == SDL_KEYDOWN) {
 				ui_process_keys(&bf_rw, mouse_position[0], mouse_position[1], sdl_event.key.keysym.sym);
+				#ifdef PATHING_DEBUG
+					#ifndef BRUTE_PATHING
+						if (sdl_event.key.keysym.sym == SDLK_p) {
+							p_draw_type = (p_draw_type == 0);
+						}
+					#endif
+				#endif
 			}
 
 			if (sdl_event.type == SDL_MOUSEMOTION) {

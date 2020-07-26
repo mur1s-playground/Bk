@@ -13,7 +13,7 @@
 		unsigned int* device_data_output, const unsigned int output_position, const unsigned int output_width, const unsigned int output_height, const unsigned int output_channels,
 		const unsigned int camera_x1, const unsigned int camera_y1, const float camera_z, const unsigned int tick_counter);
 #else	
-
+	extern int p_draw_type;
 	void launch_draw_gpu_kernel(
 		unsigned int* device_data_rw, const unsigned int pathing_position,
 		unsigned int* device_data_pathing,

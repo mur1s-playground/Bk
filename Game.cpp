@@ -1018,16 +1018,19 @@ DWORD WINAPI game_playerperception_worker_thread(LPVOID param) {
 
 				vector2<float> np = { 0.0f, 0.0f };
 				if (pl->pathing_calc_stage == -1) {
-					printf("%i setting new path\n", pl->entity_id);
+//					printf("%i setting new path\n", pl->entity_id);
 					pathing_set(&bf_rw, pl->pathing_position, vector2<float>(en->position[0], en->position[1]), pl->move_target);
 					pl->pathing_calc_stage = 0;
-				} else if (pl->pathing_calc_stage < 10) {
-					printf("%i calculating new path %i\n", pl->entity_id, pl->pathing_calc_stage);
+				} else if (pl->pathing_calc_stage <= 20) {
+//					printf("%i calculating new path %i\n", pl->entity_id, pl->pathing_calc_stage);
 					pathing_get(&bf_rw, pl->pathing_position, &bf_pathing, &bf_map, pl->pathing_calc_stage);
 					pl->pathing_calc_stage++;
-				} else if (pl->pathing_calc_stage == 10) {
+				} else if (pl->pathing_calc_stage > 20) {
 					np = pathing_get_next(&bf_rw, pl->pathing_position, &bf_pathing, vector2<float>(en->position[0], en->position[1]));
-					if (np[0] == 0.0f && np[1] == 0) pl->pathing_calc_stage = -1;
+					if (np[0] == 0.0f && np[1] == 0) {
+						pl->pathing_calc_stage = -1;
+						pl->move_reason = PAT_NONE;
+					}
 				}
 				vector2<float> active_target = { en->position[0] + np[0], en->position[1] + np[1] };
 				//printf("%f %f %f %f\n", en->position[0], np[0], en->position[1], np[1]);
