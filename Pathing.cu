@@ -120,8 +120,8 @@ __global__ void calculate_pathing_kernel(
 				bool set = false;
 				int lc = 0;
 				while (path_calc_stage > 0 && !set && lc < max(p->resolution[0], p->resolution[1])) {
-					if (path_calc_stage % 2 == 0 && (j % 32 == 0 || i % 32 == 0)) return;
-					if (path_calc_stage % 2 == 1 && (j % 32 != 0 && i % 32 != 0)) return;
+					//if (path_calc_stage % 2 == 0 && (j % 32 == 0 || i % 32 == 0)) return;
+					//if (path_calc_stage % 2 == 1 && (j % 32 != 0 && i % 32 != 0)) return;
 					float candidate_from = FLT_MAX;
 					float current = path_d[p_row * p->resolution[0] + p_col];
 					if (current == 1.0f || current == 0.0f) break;
@@ -230,8 +230,13 @@ __global__ void draw_gpu_pathing_kernel(
 					output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = (char)(-cur_val / 2.0f);
 				} else if (cur_val > 0) {
 					output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 0;
-					output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = (char)(cur_val / 2.0f);
-					output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
+					if (cur_val / 2.0f <= 255) {
+						output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = (char)(cur_val / 2.0f);
+						output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = 0;
+					} else {
+						output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 255;
+						output[current_y * (output_width * output_channels) + current_x * output_channels + 2] = (char)((cur_val-255) / 2.0f);
+					}
 				} else if (cur_val == 0) {
 					output[current_y * (output_width * output_channels) + current_x * output_channels + 0] = 255;
 					output[current_y * (output_width * output_channels) + current_x * output_channels + 1] = 0;
